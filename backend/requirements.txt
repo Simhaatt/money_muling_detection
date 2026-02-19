@@ -1,0 +1,25 @@
+# ============================================================
+# Money Muling Detection — Python Dependencies
+# ============================================================
+# Install with:  pip install -r requirements.txt
+# ============================================================
+
+# --- Web framework ---
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# --- Data processing ---
+pandas>=2.2.0
+numpy>=1.26.0
+
+# --- Graph analysis ---
+networkx>=3.2.0
+
+# --- Machine-learning / scoring (lightweight) ---
+scikit-learn>=1.4.0
+
+# --- File upload handling ---
+python-multipart>=0.0.9
+
+# --- Utilities ---
+pydantic>=2.6.0

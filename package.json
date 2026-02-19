@@ -1,0 +1,19 @@
+{
+  "name": "money-muling-detection",
+  "version": "1.0.0",
+  "description": "Full-stack Money Muling Detection platform — FastAPI + React",
+  "private": true,
+  "scripts": {
+    "start:backend": "cd backend && uvicorn main:app --reload --port 8000",
+    "start:frontend": "cd frontend && npm start",
+    "install:backend": "cd backend && pip install -r requirements.txt",
+    "install:frontend": "cd frontend && npm install",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "keywords": ["fraud-detection", "money-muling", "graph-analysis", "fastapi", "react"],
+  "license": "MIT"
+}

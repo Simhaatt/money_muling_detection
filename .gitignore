@@ -1,0 +1,38 @@
+# ============================================================
+# .gitignore — Money Muling Detection Project
+# ============================================================
+
+# ----- Python / Backend -----
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+.env
+*.log
+
+# Uploaded data (may contain PII — never commit)
+backend/uploads/*.csv
+
+# ----- Node / Frontend -----
+node_modules/
+frontend/build/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ----- IDE / OS -----
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
