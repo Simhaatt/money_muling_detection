@@ -1,69 +1,142 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-[#0F172A] text-gray-100 antialiased;
-    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 220 25% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 10%;
+
+    --primary: 155 100% 33%;
+    --primary-foreground: 0 0% 100%;
+
+    --primary-light: 130 40% 55%;
+
+    --secondary: 210 15% 93%;
+    --secondary-foreground: 220 25% 10%;
+
+    --muted: 210 15% 93%;
+    --muted-foreground: 215 12% 50%;
+
+    --accent: 155 60% 92%;
+    --accent-foreground: 155 100% 25%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 155 100% 33%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 155 100% 33%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 155 60% 92%;
+    --sidebar-accent-foreground: 155 100% 25%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 155 100% 33%;
+
+    /* Custom tokens */
+    --gradient-primary: linear-gradient(135deg, hsl(155, 100%, 33%), hsl(130, 40%, 55%));
+    --gradient-primary-hover: linear-gradient(135deg, hsl(155, 100%, 28%), hsl(130, 40%, 50%));
+    --gradient-subtle: linear-gradient(135deg, hsl(155, 60%, 95%), hsl(210, 20%, 98%));
+    --shadow-card: 0 1px 3px 0 hsl(220 25% 10% / 0.04), 0 1px 2px -1px hsl(220 25% 10% / 0.04);
+    --shadow-card-hover: 0 10px 30px -10px hsl(155 100% 33% / 0.15), 0 4px 6px -2px hsl(220 25% 10% / 0.05);
+    --shadow-glow: 0 0 20px hsl(155 100% 33% / 0.2);
   }
 
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+  .dark {
+    --background: 220 25% 6%;
+    --foreground: 210 20% 95%;
+    --card: 220 25% 9%;
+    --card-foreground: 210 20% 95%;
+    --popover: 220 25% 9%;
+    --popover-foreground: 210 20% 95%;
+    --primary: 155 100% 33%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 130 40% 55%;
+    --secondary: 217 32% 17%;
+    --secondary-foreground: 210 20% 95%;
+    --muted: 217 32% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 155 40% 15%;
+    --accent-foreground: 155 60% 70%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 20% 95%;
+    --border: 217 32% 17%;
+    --input: 217 32% 17%;
+    --ring: 155 100% 33%;
+    --sidebar-background: 220 25% 8%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 155 100% 33%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 155 40% 15%;
+    --sidebar-accent-foreground: 155 60% 70%;
+    --sidebar-border: 217 32% 17%;
+    --sidebar-ring: 155 100% 33%;
   }
-  ::-webkit-scrollbar-track {
-    background: #0f172a;
+}
+
+@layer base {
+  * {
+    @apply border-border;
   }
-  ::-webkit-scrollbar-thumb {
-    background: #334155;
-    border-radius: 4px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
   }
 }
 
 @layer components {
-  .card {
-    @apply bg-[#1E293B] border border-[#334155] rounded-xl;
+  .gradient-primary {
+    background: var(--gradient-primary);
   }
-}
 
-/* Cytoscape tooltip */
-.cy-tooltip {
-  background: #1e293b;
-  border: 1px solid #475569;
-  border-radius: 8px;
-  padding: 12px 16px;
-  color: #e2e8f0;
-  font-size: 13px;
-  line-height: 1.5;
-  pointer-events: none;
-  position: absolute;
-  z-index: 9999;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-  max-width: 280px;
-}
+  .gradient-primary-hover:hover {
+    background: var(--gradient-primary-hover);
+  }
 
-.cy-tooltip strong {
-  color: #f8fafc;
-  font-weight: 600;
-}
+  .gradient-subtle {
+    background: var(--gradient-subtle);
+  }
 
-.cy-tooltip .label {
-  color: #94a3b8;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
+  .card-forensic {
+    @apply bg-card rounded-lg border border-border;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.3s ease, transform 0.2s ease;
+  }
 
-/* Loader animation */
-@keyframes spin-slow {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+  .card-forensic:hover {
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
+  }
 
-.animate-spin-slow {
-  animation: spin-slow 3s linear infinite;
+  .glow-primary {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .grid-bg {
+    background-image:
+      linear-gradient(hsl(var(--border)) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border)) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
 }

@@ -58,11 +58,17 @@ async def health_check():
 FRONTEND_BUILD = Path(__file__).parent / "static"
 
 if FRONTEND_BUILD.exists():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_BUILD / "static")), name="static-files")
+    # Serve Vite build assets (assets/) and legacy CRA (static/)
+    assets_dir = FRONTEND_BUILD / "assets"
+    static_dir = FRONTEND_BUILD / "static"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="asset-files")
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static-files")
 
     @app.get("/{full_path:path}")
     async def serve_react(full_path: str):
-        """Catch-all: serve React index.html for client-side routing."""
+        """Catch-all: serve React/Vite index.html for client-side routing."""
         file_path = FRONTEND_BUILD / full_path
         if file_path.exists() and file_path.is_file():
             return FileResponse(str(file_path))
