@@ -298,10 +298,14 @@ def _assemble_fraud_rings(
         if avg_score < _COMMUNITY_MIN_AVG_SCORE:
             continue
 
-        # Skip if community members are a subset of (or equal to) an
-        # existing cycle ring — avoids duplicate rings for the same group.
+        # Skip if community members duplicate an existing ring:
+        #   - exact match  (member_set == existing)
+        #   - subset        (member_set ⊂ existing)
+        #   - superset      (existing ⊂ member_set) — community absorbs a
+        #     smaller cycle ring, still counts as duplicate
         member_set = frozenset(members)
-        if any(member_set <= existing for existing in existing_ring_sets):
+        if any(member_set <= existing or existing <= member_set
+               for existing in existing_ring_sets):
             continue
 
         ring_counter += 1
