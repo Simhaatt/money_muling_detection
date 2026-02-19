@@ -35,6 +35,7 @@ import pandas as pd
 from app.services.graph_builder import build_graph, graph_to_json, get_graph_stats
 from app.services.graph_features import extract_graph_features
 from app.services.scoring import compute_risk_scores
+from app.services.explanation_generator import generate_explanation
 
 logger = logging.getLogger(__name__)
 
@@ -439,6 +440,7 @@ def run_detection_pipeline(df: pd.DataFrame) -> dict[str, Any]:
                 "account_id": e["account_id"],
                 "suspicion_score": e["suspicion_score"],
                 "detected_patterns": e["detected_patterns"],
+                "explanation": generate_explanation(e["detected_patterns"]),
                 "ring_id": e["ring_id"] or "NONE",
             }
             for e in scores.values()
