@@ -1,14 +1,18 @@
 /**
- * Upload.jsx — CSV File Upload Component
- * ========================================
- * Provides a drag-and-drop / file-picker interface for uploading
- * transaction CSV files to the backend API.
+ * Upload.jsx — CSV File Upload Page
+ * ====================================
+ * Homepage of the application. Provides a drag-and-drop / file-picker
+ * interface for uploading transaction CSV files.
+ *
+ * This file lives in pages/ — designed to receive Lovable-generated UI.
  *
  * Responsibilities:
  *   • Accept .csv files from the user
  *   • POST the file to /api/upload
  *   • Show upload progress & validation feedback
- *   • On success, pass detection results up to the parent via onResults()
+ *   • On success, pass detection results up to App via onResults()
+ *
+ * Located in: frontend/src/pages/Upload.jsx
  */
 
 import React, { useState } from "react";
@@ -34,7 +38,6 @@ function Upload({ onResults }) {
     setMessage("");
 
     try {
-      // TODO: Call API and handle response
       const data = await uploadCSV(file);
       setMessage("Upload successful! Running detection pipeline…");
       if (onResults) onResults(data);
@@ -46,19 +49,24 @@ function Upload({ onResults }) {
   };
 
   return (
-    <section>
+    <section className="page upload">
       <h2>Upload Transaction Data</h2>
-      <p>Upload a CSV file containing transaction records (sender, receiver, amount, timestamp).</p>
+      <p>Upload a CSV file containing transaction records (sender_id, receiver_id, amount, timestamp).</p>
 
-      <div style={{ margin: "1rem 0" }}>
+      {/* TODO: Replace with Lovable-generated drag-and-drop upload UI */}
+      <div className="upload-area">
         <input type="file" accept=".csv" onChange={handleFileChange} />
       </div>
 
-      <button onClick={handleUpload} disabled={uploading}>
+      <button
+        className="btn-primary"
+        onClick={handleUpload}
+        disabled={uploading}
+      >
         {uploading ? "Uploading…" : "Upload & Analyse"}
       </button>
 
-      {message && <p style={{ marginTop: "0.5rem" }}>{message}</p>}
+      {message && <p className="upload-message">{message}</p>}
     </section>
   );
 }

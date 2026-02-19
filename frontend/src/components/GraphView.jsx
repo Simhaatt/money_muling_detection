@@ -3,17 +3,19 @@
  * =============================================================
  * Renders the transaction network as an interactive force-directed graph.
  *
+ * This component stays in components/ (not pages/) because it is a
+ * self-contained visualisation widget that may be embedded in multiple pages.
+ *
  * Planned features:
  *   • Nodes coloured by risk tier (green → red gradient)
  *   • Edge thickness proportional to transaction amount
  *   • Click a node to inspect its risk score & connections
  *   • Highlight detected mule clusters / communities
- *   • Zoom, pan, and search capabilities
+ *   • Fraud accounts highlighted in RED
  *
- * Library candidates:
- *   • react-force-graph-2d / 3d
- *   • D3.js (via custom hooks)
- *   • vis.js / cytoscape.js
+ * Library: react-force-graph-2d
+ *
+ * Located in: frontend/src/components/GraphView.jsx
  */
 
 import React from "react";
@@ -21,38 +23,27 @@ import React from "react";
 function GraphView({ results }) {
   if (!results || !results.graph_json) {
     return (
-      <section>
+      <section className="page">
         <h2>Transaction Graph</h2>
         <p>No data available. Upload a CSV file first to visualise the transaction network.</p>
       </section>
     );
   }
 
-  // TODO: Render interactive graph using results.graph_json
-  const { nodes, edges } = results.graph_json;
+  const { nodes, links } = results.graph_json;
 
   return (
-    <section>
+    <section className="page">
       <h2>Transaction Graph</h2>
       <p>
         Showing <strong>{nodes.length}</strong> accounts and{" "}
-        <strong>{edges.length}</strong> transactions.
+        <strong>{links.length}</strong> transactions.
       </p>
 
-      {/* TODO: Replace placeholder with interactive graph component */}
-      <div
-        style={{
-          width: "100%",
-          height: "500px",
-          border: "1px solid #ccc",
-          borderRadius: "8px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#f9f9f9",
-        }}
-      >
-        <span style={{ color: "#999" }}>[ Interactive graph will render here ]</span>
+      {/* TODO: Replace placeholder with react-force-graph-2d component */}
+      {/* Fraud nodes should be coloured RED, normal nodes GREEN */}
+      <div className="graph-container">
+        <span className="graph-placeholder">[ Interactive graph will render here ]</span>
       </div>
     </section>
   );

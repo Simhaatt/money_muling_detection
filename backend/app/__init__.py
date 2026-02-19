@@ -1,13 +1,11 @@
 """
-app package
-===========
-Core application logic for the Money Muling Detection engine.
+app — Money Muling Detection Core Package
+===========================================
+Modular backend for graph-based fraud detection.
 
-Modules:
-    graph_builder   – Build transaction graphs from CSV data
-    graph_features  – Extract graph-level & node-level features
-    scoring         – Risk-scoring algorithms for accounts
-    fraud_detection – End-to-end detection pipeline
-    routes          – FastAPI route definitions
-    utils           – Shared helper utilities
+Sub-packages:
+    routes/     — FastAPI route handlers (upload, graph, results, summary)
+    services/   — Business logic (graph building, feature extraction, scoring, pipeline)
+    models/     — Pydantic schemas for request/response validation
+    utils/      — Shared helpers (CSV validation, file I/O, constants)
 """
