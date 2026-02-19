@@ -251,11 +251,14 @@ nav button.active {
 .graph-main-panel {
   overflow: hidden;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: #e5e7eb;
+  border-color: #cbd5e1;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.22), 0 10px 20px rgba(148, 163, 184, 0.2);
 }
 
 .graph-main-panel:hover {
-  border-color: #2f4f74;
-  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.24), 0 14px 30px rgba(8, 47, 73, 0.4);
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 1px rgba(100, 116, 139, 0.32), 0 10px 20px rgba(148, 163, 184, 0.26);
 }
 
 .graph-controls-panel h3,
@@ -416,6 +419,115 @@ nav button.active {
 .graph-state.error {
   color: #fda4af;
   border-color: #9f1239;
+}
+
+/* ---------------------------------------------------------------------------
+   Tables & badges
+   --------------------------------------------------------------------------- */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  margin: 0.75rem 0 1.25rem;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid #24243b;
+  font-size: 0.92rem;
+}
+
+.data-table th {
+  text-align: left;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.02);
+  font-weight: 600;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(79, 140, 255, 0.08);
+}
+
+.mono {
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.01em;
+}
+
+.pattern-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.pattern-tag {
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid #334155;
+  background: rgba(51, 65, 85, 0.4);
+  font-size: 0.78rem;
+  color: #e2e8f0;
+}
+
+.type-badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: #0f172a;
+  background: #bae6fd;
+}
+
+.type-badge.type-cycle {
+  background: #fecdd3;
+  color: #4c0519;
+}
+
+.type-badge.type-community {
+  background: #cffafe;
+  color: #042f2e;
+}
+
+.score-badge {
+  display: inline-flex;
+  min-width: 48px;
+  justify-content: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  background: rgba(79, 140, 255, 0.12);
+  color: #bfdbfe;
+  font-weight: 600;
+}
+
+.row-critical {
+  background: rgba(255, 99, 99, 0.06);
+}
+
+.row-high {
+  background: rgba(255, 184, 79, 0.06);
+}
+
+.row-medium {
+  background: rgba(79, 140, 255, 0.04);
+}
+
+.members-cell {
+  max-width: 280px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.empty-state {
+  color: var(--color-text-muted);
+  margin: 0.3rem 0 1rem;
 }
 
 .graph-state.empty {

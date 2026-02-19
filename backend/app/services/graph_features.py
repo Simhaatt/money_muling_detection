@@ -59,11 +59,23 @@ def compute_betweenness(G: nx.DiGraph) -> dict[str, float]:
 
     High-betweenness nodes act as bridges (shell / pass-through accounts).
 
+    For large graphs (>5 000 nodes), an approximate calculation using *k*
+    sampled pivot nodes is used so that the pipeline completes within the
+    30-second budget.
+
     Returns:
         Mapping of *node → betweenness centrality*.
     """
-    if G.number_of_nodes() == 0:
+    n = G.number_of_nodes()
+    if n == 0:
         return {}
+    # Exact computation is O(V·E) – feasible only for small graphs.
+    _SAMPLE_THRESHOLD = 5_000
+    if n > _SAMPLE_THRESHOLD:
+        k = min(200, n)  # 200 pivots gives a good approximation
+        return nx.betweenness_centrality(
+            G, k=k, weight="total_amount", normalized=True, seed=42
+        )
     return nx.betweenness_centrality(G, weight="total_amount", normalized=True)
 
 

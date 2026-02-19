@@ -36,3 +36,4 @@ yarn-error.log*
 *.swo
 .DS_Store
 Thumbs.db
+money_muling_test_dataset_*.csv

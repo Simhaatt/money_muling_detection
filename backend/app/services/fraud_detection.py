@@ -280,6 +280,11 @@ def _assemble_fraud_rings(
         })
 
     # -- Community-based rings (Part 6) -------------------------------------
+    # Track existing ring member sets to avoid duplicating cycle rings
+    existing_ring_sets: list[frozenset[str]] = [
+        frozenset(r["member_accounts"]) for r in rings
+    ]
+
     communities: dict[str, int] = features.get("communities", {})
     comm_members: dict[int, list[str]] = defaultdict(list)
     for node, cid in communities.items():
@@ -291,6 +296,12 @@ def _assemble_fraud_rings(
             continue
         avg_score = _avg_score(members, scores)
         if avg_score < _COMMUNITY_MIN_AVG_SCORE:
+            continue
+
+        # Skip if community members are a subset of (or equal to) an
+        # existing cycle ring — avoids duplicate rings for the same group.
+        member_set = frozenset(members)
+        if any(member_set <= existing for existing in existing_ring_sets):
             continue
 
         ring_counter += 1
@@ -308,6 +319,8 @@ def _assemble_fraud_rings(
             "pattern_type": "community",
             "risk_score": float(round(avg_score, 2)),
         })
+
+        existing_ring_sets.append(member_set)
 
     logger.debug("Fraud rings assembled: %d", len(rings))
     return rings

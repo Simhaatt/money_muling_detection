@@ -149,27 +149,51 @@ function GraphView({ results, loading = false, error = null }) {
 
   const nodeColor = (node) => {
     const flags = nodeFlags(node);
-    if (flags.includes("suspicious") && node.suspicion_score >= 80) return "#ef4444";
-    if (flags.includes("suspicious") && node.suspicion_score >= 60) return "#f97316";
-    if (flags.includes("suspicious")) return "#facc15";
-    if (flags.includes("ring")) return "#38bdf8";
-    if (flags.includes("community")) return "#67e8f9";
-    return "#a5b4fc";
+    if (flags.includes("suspicious") && node.suspicion_score >= 80) return "#dc2626";
+    if (flags.includes("suspicious") && node.suspicion_score >= 60) return "#a16207";
+    if (flags.includes("suspicious")) return "#ea580c";
+    if (flags.includes("ring") || flags.includes("community")) return "#c2410c";
+    return "#b7c71f";
+  };
+
+  const isCoreNode = (node) => {
+    const flags = nodeFlags(node);
+    return (
+      flags.includes("suspicious") ||
+      flags.includes("ring") ||
+      flags.includes("community") ||
+      Number(node?.suspicion_score ?? 0) >= 60
+    );
+  };
+
+  const nodeLabelLines = (node) => {
+    const id = toId(node);
+    if (!id) return ["Unknown"];
+    if (id.length <= 22) return [id];
+    const midpoint = Math.floor(id.length / 2);
+    const splitIdx = id.lastIndexOf(" ", midpoint) > 0 ? id.lastIndexOf(" ", midpoint) : id.lastIndexOf("-", midpoint);
+    if (splitIdx > 3 && splitIdx < id.length - 3) {
+      return [id.slice(0, splitIdx + 1).trim(), id.slice(splitIdx + 1).trim()];
+    }
+    return [id.slice(0, 20).trim(), id.slice(20).trim()];
   };
 
   const nodeRadius = (node) => {
+    if (!isCoreNode(node)) {
+      return 4.6;
+    }
     const total = nodeAmountMap.get(toId(node)) || 0;
     if (maxAmount === minAmount) {
-      return 7;
+      return 16;
     }
     const ratio = (total - minAmount) / (maxAmount - minAmount);
-    return 5 + ratio * 12;
+    return 12 + ratio * 8;
   };
 
   const linkWidth = (link) => {
     const txCount = toTxCount(link);
     const ratio = maxTxCount > 1 ? txCount / maxTxCount : 1;
-    return 0.8 + ratio * 4;
+    return 0.5 + ratio * 2.2;
   };
 
   const selectedNodeDetails = useMemo(() => {
@@ -185,8 +209,23 @@ function GraphView({ results, loading = false, error = null }) {
       amount: nodeAmountMap.get(id) || 0,
       flags: nodeFlags(selectedNode),
       suspicionScore: Number(selectedNode?.suspicion_score ?? 0),
+      communityId: selectedNode?.community_id ?? "N/A",
     };
   }, [selectedNode, nodeAmountMap]);
+
+  useEffect(() => {
+    if (!graphRef.current || !filteredGraph.nodes.length) {
+      return;
+    }
+
+    graphRef.current.d3Force("charge")?.strength(-210);
+    graphRef.current.d3Force("link")?.distance((link) => {
+      const txCount = toTxCount(link);
+      return txCount > 8 ? 56 : 84;
+    });
+    graphRef.current.d3Force("collide", null);
+    graphRef.current.d3Force("collide", graphRef.current.d3Force("collide") || null);
+  }, [filteredGraph.nodes.length, filteredGraph.links.length]);
 
   if (loading) {
     return (
@@ -250,14 +289,6 @@ function GraphView({ results, loading = false, error = null }) {
           </div>
 
           <div className="graph-control-group">
-            <span className="control-label">Suspicion Toggles</span>
-            <label className="toggle-row"><input type="checkbox" checked={showFanIn} onChange={() => setShowFanIn((v) => !v)} />Show Fan-in nodes</label>
-            <label className="toggle-row"><input type="checkbox" checked={showFanOut} onChange={() => setShowFanOut((v) => !v)} />Show Fan-out nodes</label>
-            <label className="toggle-row"><input type="checkbox" checked={showCycles} onChange={() => setShowCycles((v) => !v)} />Show Cycles</label>
-            <label className="toggle-row"><input type="checkbox" checked={showCommunities} onChange={() => setShowCommunities((v) => !v)} />Show Communities</label>
-          </div>
-
-          <div className="graph-control-group">
             <label htmlFor="search-account">Search Account ID</label>
             <input
               id="search-account"
@@ -286,45 +317,46 @@ function GraphView({ results, loading = false, error = null }) {
               graphData={filteredGraph}
               width={size.width}
               height={size.height}
-              backgroundColor="#070b17"
+              backgroundColor="#e5e7eb"
               cooldownTicks={90}
               nodeRelSize={5}
-              linkDirectionalArrowLength={4}
+              linkDirectionalArrowLength={0}
               linkDirectionalArrowRelPos={1}
-              linkCurvature={0.08}
+              linkCurvature={0.2}
               nodeLabel={(node) => {
                 const id = toId(node);
-                const flags = nodeFlags(id).join(", ") || "none";
-                const inD = graphPayload.features?.in_degree?.[id] ?? 0;
-                const outD = graphPayload.features?.out_degree?.[id] ?? 0;
-                return `<div style="padding:6px 8px;"><strong>${id}</strong><br/>In/Out: ${inD}/${outD}<br/>Flags: ${flags}</div>`;
+                const flags = nodeFlags(node).join(", ") || "none";
+                const inD = node.in_degree ?? 0;
+                const outD = node.out_degree ?? 0;
+                return `<div style="padding:6px 8px;"><strong>${id}</strong><br/>Score: ${formatValue(node.suspicion_score, 1)}<br/>In/Out: ${inD}/${outD}<br/>Flags: ${flags}</div>`;
               }}
               linkLabel={(link) => `<div style="padding:6px 8px;"><strong>${toSource(link)} → ${toTarget(link)}</strong><br/>Tx Count: ${formatValue(toTxCount(link), 0)}<br/>Total Amount: ${formatValue(toAmount(link), 2)}</div>`}
               linkWidth={linkWidth}
               linkColor={(link) => {
                 const isSelected = selectedLink && toSource(selectedLink) === toSource(link) && toTarget(selectedLink) === toTarget(link);
-                return isSelected ? "#5eead4" : "rgba(148, 163, 184, 0.35)";
+                return isSelected ? "rgba(220, 38, 38, 0.75)" : "rgba(31, 41, 55, 0.24)";
               }}
               nodeCanvasObject={(node, ctx, globalScale) => {
                 const id = toId(node);
+                const lines = nodeLabelLines(node);
                 const radius = nodeRadius(node);
                 const color = nodeColor(node);
                 const isSearched = searchedNodeId === id;
                 const isHovered = hoverNodeId === id;
                 const isSelected = selectedNode && toId(selectedNode) === id;
-                const isSuspicious = nodeFlags(id).length > 0;
+                const coreNode = isCoreNode(node);
 
                 ctx.save();
 
-                if (isSuspicious) {
-                  ctx.shadowColor = color;
-                  ctx.shadowBlur = 14;
+                if (coreNode) {
+                  ctx.shadowColor = "rgba(0, 0, 0, 0.22)";
+                  ctx.shadowBlur = 8;
                 }
 
                 if (isSearched || isSelected || isHovered) {
                   ctx.beginPath();
-                  ctx.arc(node.x, node.y, radius + 5, 0, 2 * Math.PI);
-                  ctx.fillStyle = isSearched ? "rgba(94, 234, 212, 0.32)" : "rgba(167, 139, 250, 0.22)";
+                  ctx.arc(node.x, node.y, radius + 4.2, 0, 2 * Math.PI);
+                  ctx.fillStyle = isSearched ? "rgba(220, 38, 38, 0.18)" : "rgba(31, 41, 55, 0.12)";
                   ctx.fill();
                 }
 
@@ -332,15 +364,52 @@ function GraphView({ results, loading = false, error = null }) {
                 ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
                 ctx.fillStyle = color;
                 ctx.fill();
-                ctx.lineWidth = isSelected ? 2.4 : 1.1;
-                ctx.strokeStyle = isSelected ? "#f8fafc" : "rgba(2, 6, 23, 0.9)";
+                ctx.lineWidth = isSelected ? 2.2 : 1;
+                ctx.strokeStyle = isSelected ? "#111827" : "rgba(0, 0, 0, 0.22)";
                 ctx.stroke();
 
-                if (globalScale > 2.2 || isHovered || isSelected || isSearched) {
-                  const fontSize = Math.max(9, 12 / globalScale);
+                if (coreNode) {
+                  const iconSize = Math.max(8, 14 / globalScale);
+                  ctx.font = `700 ${iconSize}px Inter, Segoe UI, sans-serif`;
+                  ctx.fillStyle = "#f8fafc";
+                  ctx.textAlign = "center";
+                  ctx.textBaseline = "middle";
+                  ctx.fillText("🏛", node.x, node.y + 0.2);
+
+                  const badgeValue = Math.max(
+                    Number(node.in_degree ?? 0) + Number(node.out_degree ?? 0),
+                    Math.round(Number(node.suspicion_score ?? 0) / 5)
+                  );
+                  if (badgeValue > 0) {
+                    const badgeRadius = Math.max(4.5, radius * 0.34);
+                    const badgeX = node.x + radius * 0.66;
+                    const badgeY = node.y - radius * 0.7;
+                    ctx.beginPath();
+                    ctx.arc(badgeX, badgeY, badgeRadius, 0, 2 * Math.PI);
+                    ctx.fillStyle = "#ef4444";
+                    ctx.fill();
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = "#fff";
+                    ctx.stroke();
+
+                    ctx.font = `700 ${Math.max(6, 9 / globalScale)}px Inter, Segoe UI, sans-serif`;
+                    ctx.fillStyle = "#fff";
+                    ctx.fillText(String(Math.round(badgeValue)), badgeX, badgeY + 0.2);
+                  }
+                }
+
+                if (globalScale > 1.4 || isHovered || isSelected || isSearched || coreNode) {
+                  const fontSize = Math.max(8, 11 / globalScale);
                   ctx.font = `${fontSize}px Inter, Segoe UI, sans-serif`;
-                  ctx.fillStyle = "#dbeafe";
-                  ctx.fillText(id, node.x + radius + 3, node.y + 3);
+                  ctx.fillStyle = "#4b5563";
+                  ctx.textAlign = "center";
+                  ctx.textBaseline = "middle";
+                  if (coreNode && lines.length > 1) {
+                    ctx.fillText(lines[0], node.x, node.y + radius + 12 / globalScale);
+                    ctx.fillText(lines[1], node.x, node.y + radius + 24 / globalScale);
+                  } else {
+                    ctx.fillText(lines[0], node.x, node.y + radius + 12 / globalScale);
+                  }
                 }
 
                 ctx.restore();
