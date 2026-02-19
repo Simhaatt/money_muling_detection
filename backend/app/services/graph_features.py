@@ -1,121 +1,284 @@
 """
 graph_features.py — Feature Extraction from Transaction Graphs
 ================================================================
-Computes node-level and graph-level features used for risk scoring.
+Extracts fraud-relevant graph metrics from a directed transaction graph
+built by graph_builder.py.
 
-Core detection features:
-    • Cycle detection       (money round-tripping, length 3–5)
-    • Fan-in detection      (many senders → one receiver)
-    • Fan-out detection     (one sender → many receivers)
-    • Layering detection    (long chains with low-activity intermediaries)
+Input :  NetworkX DiGraph G  (edges carry ``transaction_count`` and
+         ``total_amount`` weights produced by ``build_graph``).
+Output:  Dictionary consumed by scoring.py
 
-Advanced features:
-    • Louvain community detection  (fraud cluster identification)
-    • PageRank                     (influential mule account detection)
-    • Betweenness centrality       (bridge / shell account detection)
-    • Temporal velocity            (rapid fund movement detection)
+Feature categories
+------------------
+Centrality   — PageRank, betweenness centrality
+Degree       — in_degree, out_degree per node
+Mule signals — fan-in nodes, fan-out nodes
+Topology     — simple cycles, nodes participating in cycles
+Communities  — Louvain partition on the undirected projection
 
 Located in: app/services/graph_features.py
-Called by:   app/services/fraud_detection.py
+Called by:   app/services/fraud_detection.py → scoring.py
 """
 
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+import community as community_louvain  # python-louvain
 import networkx as nx
-import pandas as pd
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Constants — tuneable thresholds
+# ---------------------------------------------------------------------------
+_FAN_IN_MIN_IN_DEGREE: int = 5    # min senders to flag as fan-in
+_FAN_IN_MAX_OUT_DEGREE: int = 2   # max receivers allowed for fan-in node
+_FAN_OUT_MIN_OUT_DEGREE: int = 5  # min receivers to flag as fan-out
+_FAN_OUT_MAX_IN_DEGREE: int = 2   # max senders allowed for fan-out node
 
 
-def compute_node_features(G: nx.DiGraph) -> pd.DataFrame:
-    """
-    Compute per-node features used for risk scoring.
+# ── Centrality ─────────────────────────────────────────────────────────────
+def compute_pagerank(G: nx.DiGraph) -> dict[str, float]:
+    """Compute PageRank weighted by ``total_amount``.
 
-    Features computed:
-        - in_degree, out_degree
-        - pagerank
-        - betweenness_centrality
-        - cycle_participation_count
-        - fan_in_flag, fan_out_flag
-        - is_layering_intermediary
+    Nodes with disproportionately high PageRank may be central mule
+    accounts funnelling money through the network.
 
     Returns:
-        DataFrame indexed by node with feature columns
+        Mapping of *node → PageRank score*.
     """
-    # TODO: Implement feature extraction pipeline
-    return pd.DataFrame()
+    if G.number_of_nodes() == 0:
+        return {}
+    return nx.pagerank(G, weight="total_amount")
 
 
-def detect_cycles(G: nx.DiGraph, max_length: int = 5) -> list:
+def compute_betweenness(G: nx.DiGraph) -> dict[str, float]:
+    """Compute normalised betweenness centrality weighted by ``total_amount``.
+
+    High-betweenness nodes act as bridges (shell / pass-through accounts).
+
+    Returns:
+        Mapping of *node → betweenness centrality*.
     """
-    Identify simple cycles (length 3–5) indicating fund round-tripping.
+    if G.number_of_nodes() == 0:
+        return {}
+    return nx.betweenness_centrality(G, weight="total_amount", normalized=True)
+
+
+# ── Degree features ───────────────────────────────────────────────────────
+def compute_degree_features(G: nx.DiGraph) -> tuple[dict[str, int], dict[str, int]]:
+    """Return per-node in-degree and out-degree dictionaries.
+
+    Returns:
+        Tuple of (in_degree_dict, out_degree_dict).
+    """
+    in_degree: dict[str, int] = dict(G.in_degree())
+    out_degree: dict[str, int] = dict(G.out_degree())
+    return in_degree, out_degree
+
+
+# ── Fan-in / Fan-out detection ────────────────────────────────────────────
+def detect_fan_in(
+    G: nx.DiGraph,
+    min_in: int = _FAN_IN_MIN_IN_DEGREE,
+    max_out: int = _FAN_IN_MAX_OUT_DEGREE,
+    *,
+    _in_deg: dict[str, int] | None = None,
+    _out_deg: dict[str, int] | None = None,
+) -> list[str]:
+    """Detect **fan-in** mule patterns.
+
+    A fan-in node collects funds from many senders while dispersing to
+    very few receivers — classic *collector* mule behaviour.
+
+    Criteria:
+        * ``in_degree >= min_in``  (default 5)
+        * ``out_degree <= max_out`` (default 2)
 
     Args:
-        G: Transaction directed graph
-        max_length: Maximum cycle length to search for (default 5)
+        _in_deg, _out_deg: Pre-computed degree dicts (avoids redundant
+            lookups when called from ``extract_graph_features``).
 
     Returns:
-        List of cycles, each cycle is a list of node IDs
+        List of node IDs flagged as fan-in.
     """
-    # TODO: Implement cycle detection using nx.simple_cycles()
-    return []
+    in_deg = _in_deg or dict(G.in_degree())
+    out_deg = _out_deg or dict(G.out_degree())
+    fan_in_nodes: list[str] = [
+        node for node in G.nodes()
+        if in_deg[node] >= min_in and out_deg[node] <= max_out
+    ]
+    logger.debug("Fan-in nodes detected: %d", len(fan_in_nodes))
+    return fan_in_nodes
 
 
-def detect_fan_in(G: nx.DiGraph, threshold: int = 5) -> list:
-    """
-    Detect accounts receiving from many senders within a time window.
+def detect_fan_out(
+    G: nx.DiGraph,
+    min_out: int = _FAN_OUT_MIN_OUT_DEGREE,
+    max_in: int = _FAN_OUT_MAX_IN_DEGREE,
+    *,
+    _in_deg: dict[str, int] | None = None,
+    _out_deg: dict[str, int] | None = None,
+) -> list[str]:
+    """Detect **fan-out** mule patterns.
+
+    A fan-out node distributes funds to many receivers while receiving
+    from very few senders — classic *distributor* mule behaviour.
+
+    Criteria:
+        * ``out_degree >= min_out`` (default 5)
+        * ``in_degree <= max_in``   (default 2)
 
     Args:
-        threshold: Minimum number of unique senders to flag (default 5)
+        _in_deg, _out_deg: Pre-computed degree dicts (avoids redundant
+            lookups when called from ``extract_graph_features``).
 
     Returns:
-        List of {"account": str, "sender_count": int, "total_received": float}
+        List of node IDs flagged as fan-out.
     """
-    # TODO: Implement fan-in detection
-    return []
+    in_deg = _in_deg or dict(G.in_degree())
+    out_deg = _out_deg or dict(G.out_degree())
+    fan_out_nodes: list[str] = [
+        node for node in G.nodes()
+        if out_deg[node] >= min_out and in_deg[node] <= max_in
+    ]
+    logger.debug("Fan-out nodes detected: %d", len(fan_out_nodes))
+    return fan_out_nodes
 
 
-def detect_fan_out(G: nx.DiGraph, threshold: int = 5) -> list:
-    """
-    Detect accounts sending to many receivers within a time window.
+# ── Cycle detection ───────────────────────────────────────────────────────
+# Default safety cap: avoids exponential blowup on dense graphs.
+_MAX_CYCLE_LENGTH: int = 6
+_MAX_CYCLES_COLLECTED: int = 500
 
-    Args:
-        threshold: Minimum number of unique receivers to flag (default 5)
+
+def detect_cycles(
+    G: nx.DiGraph,
+    length_bound: int = _MAX_CYCLE_LENGTH,
+    max_cycles: int = _MAX_CYCLES_COLLECTED,
+) -> tuple[list[list[str]], list[str]]:
+    """Find simple cycles in the directed graph.
+
+    Cycles indicate **fund round-tripping** — money sent in a loop to
+    obscure its origin.
+
+    Safety guards (critical for production):
+        * ``length_bound`` caps the maximum cycle length searched.
+          Without this, ``nx.simple_cycles`` can return an **exponential**
+          number of results on dense graphs and hang indefinitely.
+        * ``max_cycles`` caps the total number of cycles collected to
+          prevent memory exhaustion.
 
     Returns:
-        List of {"account": str, "receiver_count": int, "total_sent": float}
+        Tuple of:
+            * ``cycles`` — list of cycles (each a list of node IDs),
+              capped at *max_cycles*.
+            * ``nodes_in_cycles`` — deduplicated list of all nodes
+              that participate in at least one collected cycle.
     """
-    # TODO: Implement fan-out detection
-    return []
+    cycles: list[list[str]] = []
+    seen_nodes: set[str] = set()
+    nodes_in_cycles: list[str] = []
+
+    # nx.simple_cycles yields lazily — consume only what we need.
+    for cycle in nx.simple_cycles(G, length_bound=length_bound):
+        cycles.append(cycle)
+        for node in cycle:
+            if node not in seen_nodes:
+                seen_nodes.add(node)
+                nodes_in_cycles.append(node)
+        if len(cycles) >= max_cycles:
+            logger.warning(
+                "Cycle cap reached (%d). Stopping enumeration early.", max_cycles
+            )
+            break
+
+    logger.debug("Cycles found: %d  |  Unique nodes in cycles: %d",
+                 len(cycles), len(nodes_in_cycles))
+    return cycles, nodes_in_cycles
 
 
-def detect_layering(G: nx.DiGraph, max_intermediary_txns: int = 3) -> list:
-    """
-    Detect layering chains (A → B → C → D) where intermediaries
-    have very few transactions (pass-through accounts).
+# ── Community detection (Louvain) ─────────────────────────────────────────
+def detect_communities(G: nx.DiGraph) -> dict[str, int]:
+    """Run **Louvain** community detection on the undirected projection.
+
+    Tightly-connected clusters may represent coordinated mule rings.
+    The algorithm operates on an undirected view; direction is dropped
+    intentionally since mule rings communicate bidirectionally.
 
     Returns:
-        List of detected layering chains
+        Mapping of *node → community_id* (int).
     """
-    # TODO: Implement layering chain detection
-    return []
+    if G.number_of_nodes() == 0:
+        return {}
+
+    # Louvain expects an undirected graph
+    undirected: nx.Graph = G.to_undirected()
+    partition: dict[str, int] = community_louvain.best_partition(undirected)
+    n_communities = len(set(partition.values()))
+    logger.debug("Louvain communities detected: %d", n_communities)
+    return partition
 
 
-def detect_communities(G: nx.DiGraph) -> dict:
-    """
-    Run Louvain community detection to find tightly-connected clusters
-    that may represent mule networks.
+# ── Public aggregator ─────────────────────────────────────────────────────
+def extract_graph_features(G: nx.DiGraph) -> dict[str, Any]:
+    """Run **all** feature extractors and return a unified dictionary.
+
+    This is the single entry-point called by ``fraud_detection.py``.
+    The returned dictionary is consumed directly by ``scoring.py``.
 
     Returns:
-        dict mapping node -> community_id
-    """
-    # TODO: Implement Louvain community detection
-    return {}
+        Dictionary with the following keys::
 
-
-def compute_temporal_velocity(G: nx.DiGraph) -> dict:
+            {
+                "pagerank":        {node: float, ...},
+                "betweenness":     {node: float, ...},
+                "in_degree":       {node: int, ...},
+                "out_degree":      {node: int, ...},
+                "fan_in_nodes":    [node, ...],
+                "fan_out_nodes":   [node, ...],
+                "cycles":          [[node, ...], ...],
+                "nodes_in_cycles": [node, ...],
+                "communities":     {node: community_id, ...},
+            }
     """
-    Analyse time difference between receiving and sending for each node.
-    Rapid forwarding (receive → send within minutes) is a strong mule indicator.
+    logger.info("Extracting graph features from %d nodes, %d edges …",
+                G.number_of_nodes(), G.number_of_edges())
 
-    Returns:
-        dict mapping node -> {"avg_forward_time_minutes": float, "is_rapid": bool}
-    """
-    # TODO: Implement temporal velocity analysis
-    return {}
+    # Centrality measures
+    pagerank = compute_pagerank(G)
+    betweenness = compute_betweenness(G)
+
+    # Degree features (computed once, reused by fan-in/fan-out)
+    in_degree, out_degree = compute_degree_features(G)
+
+    # Mule-pattern detection — pass pre-computed degrees to avoid redundant work
+    fan_in_nodes = detect_fan_in(G, _in_deg=in_degree, _out_deg=out_degree)
+    fan_out_nodes = detect_fan_out(G, _in_deg=in_degree, _out_deg=out_degree)
+
+    # Cycle detection
+    cycles, nodes_in_cycles = detect_cycles(G)
+
+    # Community detection (Louvain)
+    communities = detect_communities(G)
+
+    features: dict[str, Any] = {
+        "pagerank": pagerank,
+        "betweenness": betweenness,
+        "in_degree": in_degree,
+        "out_degree": out_degree,
+        "fan_in_nodes": fan_in_nodes,
+        "fan_out_nodes": fan_out_nodes,
+        "cycles": cycles,
+        "nodes_in_cycles": nodes_in_cycles,
+        "communities": communities,
+    }
+
+    logger.info("Feature extraction complete — %d fan-in, %d fan-out, "
+                "%d cycles, %d communities",
+                len(fan_in_nodes), len(fan_out_nodes),
+                len(cycles), len(set(communities.values())) if communities else 0)
+
+    return features

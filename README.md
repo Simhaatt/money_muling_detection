@@ -2,31 +2,169 @@
 
 > Graph-based fraud detection platform for identifying money mule networks in financial transaction data.
 
+**Live Demo:** _Coming soon (Railway deployment pending)_
+
 ---
 
 ## Overview
 
-Money muling is a form of money laundering where criminals recruit individuals (mules) to transfer illegally obtained funds through their accounts. This platform uses **graph analysis** and **risk scoring** to automatically detect suspicious transaction patterns that indicate money muling activity.
+Money muling is a form of money laundering where criminals recruit individuals (mules) to transfer illegally obtained funds through their accounts. This platform uses **graph analysis**, **network topology metrics**, and **rule-based risk scoring** to automatically detect suspicious transaction patterns that indicate money muling activity.
 
 ### Key Capabilities
 
 - **CSV Upload** — Ingest raw transaction data (sender, receiver, amount, timestamp)
-- **Graph Construction** — Build directed transaction networks using NetworkX
-- **Feature Extraction** — Compute centrality metrics, detect cycles & communities
-- **Risk Scoring** — Classify accounts into LOW / MEDIUM / HIGH / CRITICAL tiers
-- **Interactive Visualisation** — Explore the transaction graph with node-level drill-down
-- **Dashboard** — Summary statistics, risk distribution, and flagged account tables
+- **Graph Construction** — Build directed, weighted transaction networks using NetworkX
+- **Feature Extraction** — PageRank, betweenness centrality, cycle detection, Louvain communities, fan-in/fan-out patterns
+- **Risk Scoring** — Weighted, explainable scoring engine classifying accounts into LOW / MEDIUM / HIGH / CRITICAL tiers
+- **Advanced Detection** — Temporal smurfing (72h sliding window), shell account identification, false-positive suppression
+- **Fraud Ring Assembly** — Automatic grouping of suspicious accounts into rings via cycle analysis and community detection
+- **Downloadable JSON Output** — Exact hackathon-compliant JSON with `suspicious_accounts`, `fraud_rings`, and `summary`
 
 ---
 
 ## Tech Stack
 
-| Layer     | Technology                               |
-| --------- | ---------------------------------------- |
-| Backend   | Python · FastAPI · NetworkX · Pandas · NumPy |
-| Frontend  | React · Axios · Recharts · react-force-graph |
-| Deploy    | Railway (single-deploy: API + static frontend) |
-| Dev Tools | Uvicorn · Concurrently · npm scripts     |
+| Layer     | Technology                                              |
+| --------- | ------------------------------------------------------- |
+| Backend   | Python 3.12 · FastAPI · NetworkX · python-louvain · scipy · Pandas · NumPy |
+| Frontend  | React 18 · Axios · Recharts · react-force-graph-2d      |
+| Testing   | pytest (80 tests across 5 test files)                    |
+| Deploy    | Railway (single-deploy: API + static frontend)           |
+| Dev Tools | Uvicorn · Concurrently · npm scripts                     |
+
+---
+
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        FastAPI Backend                           │
+│                                                                 │
+│  POST /api/upload                                               │
+│       │                                                         │
+│       ▼                                                         │
+│  ┌──────────┐   ┌───────────────┐   ┌──────────┐               │
+│  │  helpers  │──▶│ graph_builder │──▶│ graph    │               │
+│  │ (validate │   │ (vectorized   │   │ features │               │
+│  │  & parse) │   │  DiGraph)     │   │ (7 algo) │               │
+│  └──────────┘   └───────────────┘   └────┬─────┘               │
+│                                          │                      │
+│                                          ▼                      │
+│                                    ┌──────────┐                 │
+│                                    │ scoring  │                 │
+│                                    │ (0–100)  │                 │
+│                                    └────┬─────┘                 │
+│                                         │                       │
+│                                         ▼                       │
+│                                ┌─────────────────┐              │
+│                                │fraud_detection   │              │
+│                                │ (10-part pipeline│              │
+│                                │  orchestrator)   │              │
+│                                └────────┬────────┘              │
+│                                         │                       │
+│                                         ▼                       │
+│                                   JSON Output                   │
+│                                                                 │
+│  GET /api/graph · /api/results · /api/summary · /api/download   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Algorithm Approach
+
+### Pipeline Stages (10 parts)
+
+| Stage | Component | Complexity | Description |
+|-------|-----------|------------|-------------|
+| 1 | **Graph Construction** | O(E) | Vectorized `groupby().agg()` + `nx.from_pandas_edgelist()` — bulk edge insertion from CSV |
+| 2 | **PageRank** | O(N + E) per iteration | Weighted by `total_amount`; identifies central money-funnelling nodes |
+| 3 | **Betweenness Centrality** | O(N × E) | Weighted; flags bridge/pass-through accounts |
+| 4 | **Fan-in / Fan-out Detection** | O(N) | Single-pass with pre-computed degree dicts; collector mules (in≥5, out≤2) and distributor mules (out≥5, in≤2) |
+| 5 | **Cycle Detection** | O(N + E) bounded | `nx.simple_cycles` with `length_bound=6` and `max_cycles=500` safety caps to prevent exponential blowup |
+| 6 | **Louvain Community Detection** | O(N log N) | Undirected projection; tightly-connected clusters indicate coordinated rings |
+| 7 | **Risk Scoring** | O(N) | Single-pass weighted scoring with pre-computed thresholds (see weights table below) |
+| 8 | **Temporal Smurfing** | O(T log T) per account | Two-pointer sliding window over sorted timestamps; flags ≥10 txns within 72 hours |
+| 9 | **Shell Account Detection** | O(N) | Single-pass degree + chain-depth check (optimized from O(N²) path enumeration) |
+| 10 | **False-Positive Suppression** | O(N) | Payroll (−30%), merchant (−30%), payment gateway (−40%) score reductions |
+
+### Overall Complexity
+
+- **Time:** O(N × E) dominated by betweenness centrality (stages 1–10 are otherwise O(N + E) or better)
+- **Space:** O(N + E) for graph + feature dictionaries
+
+---
+
+## Suspicion Score Methodology
+
+Each account receives a base score from detected patterns, then adjustments from advanced detection stages:
+
+### Base Scoring Weights
+
+| Feature                           | Points | Trigger Condition |
+| --------------------------------- | ------ | ----------------- |
+| Cycle participation               | +60    | Account appears in a directed cycle (length ≤ 6) |
+| Fan-in pattern                    | +25    | in_degree ≥ 5 AND out_degree ≤ 2 |
+| Fan-out pattern                   | +25    | out_degree ≥ 5 AND in_degree ≤ 2 |
+| Community membership              | +20    | Part of a Louvain community cluster |
+| High PageRank                     | +10    | PageRank > 2× network mean |
+| High betweenness centrality       | +10    | Betweenness > 2× network mean |
+
+### Advanced Detection Adjustments
+
+| Feature                           | Points | Trigger Condition |
+| --------------------------------- | ------ | ----------------- |
+| Temporal smurfing (high velocity) | +15    | ≥ 10 transactions within any 72-hour window |
+| Shell account                     | +30    | Pass-through node (degree 2–3) in chain of depth ≥ 3 |
+| Likely payroll (suppression)      | −30%   | out_degree ≥ 10 AND < 20% of recipients forward funds |
+| Likely merchant (suppression)     | −30%   | in_degree ≥ 10 AND out_degree ≤ 1 |
+| Payment gateway (suppression)     | −40%   | in_degree ≥ 50 AND out_degree ≥ 50 |
+
+**Final score** clamped to **[0, 100]**.
+
+### Risk Tier Classification
+
+| Tier       | Score Range |
+| ---------- | ----------- |
+| CRITICAL   | ≥ 80        |
+| HIGH       | ≥ 60        |
+| MEDIUM     | ≥ 40        |
+| LOW        | < 40        |
+
+**Suspicious threshold:** accounts with score **≥ 40** are flagged.
+
+---
+
+## JSON Output Format
+
+The pipeline returns the exact hackathon-compliant JSON schema:
+
+```json
+{
+  "suspicious_accounts": [
+    {
+      "account_id": "ACC_00123",
+      "suspicion_score": 87.5,
+      "detected_patterns": ["cycle_length_3", "high_velocity"],
+      "ring_id": "RING_001"
+    }
+  ],
+  "fraud_rings": [
+    {
+      "ring_id": "RING_001",
+      "member_accounts": ["ACC_00123", "..."],
+      "pattern_type": "cycle",
+      "risk_score": 95.3
+    }
+  ],
+  "summary": {
+    "total_accounts_analyzed": 500,
+    "suspicious_accounts_flagged": 15,
+    "fraud_rings_detected": 4,
+    "processing_time_seconds": 2.3
+  }
+}
+```
 
 ---
 
@@ -36,66 +174,68 @@ Money muling is a form of money laundering where criminals recruit individuals (
 money_muling_detection/
 │
 ├── backend/
-│   ├── main.py                          # FastAPI entry point + static file serving
+│   ├── main.py                          # FastAPI entry point + CORS + static serving
 │   ├── requirements.txt                 # Python dependencies
 │   ├── uploads/                         # Uploaded CSV files (git-ignored)
 │   └── app/
-│       ├── __init__.py                  # Package init
-│       ├── routes/                      # API route handlers (modular)
+│       ├── routes/                      # API route handlers
 │       │   ├── __init__.py              # Aggregates all routers
-│       │   ├── upload_routes.py         # POST /api/upload
+│       │   ├── upload_routes.py         # POST /api/upload (fully wired)
 │       │   ├── graph_routes.py          # GET  /api/graph
 │       │   ├── results_routes.py        # GET  /api/results, /risk-scores, /download
 │       │   └── summary_routes.py        # GET  /api/summary
-│       ├── services/                    # Business logic layer
-│       │   ├── __init__.py              # Re-exports all services
-│       │   ├── graph_builder.py         # Build NetworkX DiGraph from CSV
-│       │   ├── graph_features.py        # Feature extraction & detection algorithms
-│       │   ├── scoring.py               # Risk scoring engine (0–100 + tiers)
-│       │   └── fraud_detection.py       # End-to-end pipeline orchestrator
-│       ├── models/                      # Pydantic schemas
-│       │   ├── __init__.py
-│       │   └── schemas.py              # Request/response data models
-│       └── utils/                       # Shared helpers
-│           ├── __init__.py
+│       ├── services/                    # Business logic (fully implemented)
+│       │   ├── __init__.py              # Re-exports all public functions
+│       │   ├── graph_builder.py         # Vectorized DiGraph construction
+│       │   ├── graph_features.py        # 7 feature extractors + aggregator
+│       │   ├── scoring.py               # Weighted risk scoring engine
+│       │   └── fraud_detection.py       # 10-part detection pipeline
+│       ├── models/
+│       │   └── schemas.py               # Pydantic request/response models
+│       └── utils/
 │           └── helpers.py               # CSV validation, file I/O, constants
 │
-├── frontend/
-│   ├── package.json                     # React dependencies & scripts
-│   ├── public/
-│   │   └── index.html                   # HTML template
+├── frontend/                            # React SPA (placeholder UI)
+│   ├── package.json
+│   ├── public/index.html
 │   └── src/
-│       ├── index.js                     # React DOM entry point
-│       ├── App.jsx                      # Root component & view switching
-│       ├── pages/                       # Full-page views (Lovable-ready)
-│       │   ├── Upload.jsx               # CSV upload page (homepage)
-│       │   ├── Dashboard.jsx            # Results overview & metrics
-│       │   └── Summary.jsx              # Detailed stats + JSON download
-│       ├── components/                  # Reusable UI components
-│       │   ├── GraphView.jsx            # Interactive graph visualisation
-│       │   └── common/                  # Shared widgets (cards, spinners, etc.)
-│       │       └── index.js
-│       ├── services/
-│       │   └── api.js                   # Axios API service layer
-│       └── styles/
-│           └── global.css               # Global styles & CSS variables
+│       ├── App.jsx                      # Root component + routing
+│       ├── pages/                       # Upload, Dashboard, Summary pages
+│       ├── components/                  # GraphView, common widgets
+│       ├── services/api.js              # Axios API layer
+│       └── styles/global.css            # Dark theme CSS
 │
-├── package.json                         # Root dev scripts (install:all, dev, build)
+├── tests/                               # pytest test suite (80 tests)
+│   ├── conftest.py                      # sys.path setup
+│   ├── test_graph_builder.py            # 4 tests
+│   ├── test_graph_features.py           # 22 tests
+│   ├── test_scoring.py                  # 16 tests
+│   ├── test_fraud_detection.py          # 22 tests
+│   └── test_upload_routes.py            # 16 tests
+│
+├── package.json                         # Root dev scripts
 ├── .gitignore
 └── README.md
 ```
 
 ---
 
-## Getting Started
+## Installation & Setup
 
 ### Prerequisites
 
 - Python 3.10+
 - Node.js 18+
-- npm or yarn
+- npm
 
-### 1. Install Dependencies
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/Simhaatt/money_muling_detection.git
+cd money_muling_detection
+```
+
+### 2. Install Dependencies
 
 ```bash
 # Backend
@@ -113,7 +253,7 @@ Or from the project root:
 npm run install:all
 ```
 
-### 2. Run the Application
+### 3. Run the Application
 
 **Backend** (port 8000):
 
@@ -135,54 +275,64 @@ npm start
 npm run dev
 ```
 
-### 3. Open the App
+### 4. Run Tests
+
+```bash
+cd /path/to/money_muling_detection
+PYTHONPATH=backend pytest tests/ -v
+```
+
+All **80 tests** should pass.
+
+### 5. Open the App
 
 Navigate to [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## API Endpoints
+## Usage Instructions
 
-| Method | Endpoint           | Description                          |
-| ------ | ------------------ | ------------------------------------ |
-| GET    | `/api/health`      | Health check                         |
-| POST   | `/api/upload`      | Upload CSV transaction file          |
-| GET    | `/api/results`     | Full detection results               |
-| GET    | `/api/graph`       | Serialised graph (nodes + links)     |
-| GET    | `/api/risk-scores` | Per-account risk scores & tiers      |
-| GET    | `/api/summary`     | High-level summary statistics        |
-| GET    | `/api/download`    | Download results as JSON file        |
+1. **Start the backend** — `uvicorn main:app --reload --port 8000`
+2. **Upload a CSV** — `POST /api/upload` with a file containing columns: `sender_id`, `receiver_id`, `amount`, `timestamp`
+3. **Get results** — The response is the full detection JSON (`suspicious_accounts`, `fraud_rings`, `summary`)
+4. **Download output** — Use `/api/download` to retrieve the JSON file
+
+### Example cURL
+
+```bash
+curl -X POST http://localhost:8000/api/upload \
+  -F "file=@transactions.csv" \
+  | python -m json.tool
+```
 
 ---
 
-## How It Works
+## API Endpoints
 
-```
-CSV Upload → Parse → Build Graph → Core Detection → Advanced Detection → Score → Visualise
-```
+| Method | Endpoint           | Status | Description                          |
+| ------ | ------------------ | ------ | ------------------------------------ |
+| GET    | `/api/health`      | ✅     | Health check                         |
+| POST   | `/api/upload`      | ✅     | Upload CSV → full pipeline → JSON    |
+| GET    | `/api/graph`       | 🔲     | Serialised graph (nodes + links)     |
+| GET    | `/api/results`     | 🔲     | Full detection results               |
+| GET    | `/api/risk-scores` | 🔲     | Per-account risk scores & tiers      |
+| GET    | `/api/summary`     | 🔲     | High-level summary statistics        |
+| GET    | `/api/download`    | 🔲     | Download results as JSON file        |
 
-1. **Upload** a CSV with columns: `sender_id`, `receiver_id`, `amount`, `timestamp`
-2. **Graph Builder** constructs a directed, weighted transaction network (NetworkX DiGraph)
-3. **Core Detection** — cycle detection, fan-in/fan-out, layering chains
-4. **Advanced Detection** — Louvain communities, PageRank, betweenness centrality, temporal velocity
-5. **Scoring Engine** — weighted combination → 0–100 risk score → tier (LOW/MEDIUM/HIGH/CRITICAL)
-6. **Fraud Ring Assembly** — groups flagged accounts into rings (from cycles + communities)
-7. **Frontend** — Dashboard (stats + tables), Graph View (force-directed), Summary (JSON download)
+✅ = Fully implemented &nbsp;&nbsp; 🔲 = Placeholder (returns stub data)
 
-## Detection Scoring Weights
+---
 
-| Feature                  | Score |
-| ------------------------ | ----- |
-| Cycle participation      | +60   |
-| Fan-in flagged           | +25   |
-| Fan-out flagged          | +25   |
-| Layering intermediary    | +20   |
-| Louvain cluster member   | +20   |
-| High PageRank            | +10   |
-| High betweenness         | +10   |
-| Rapid temporal velocity  | +15   |
+## Known Limitations
 
-Final score capped at **100**. Fraud threshold: **≥ 50**.
+- **GET endpoints** (`/api/graph`, `/api/results`, `/api/summary`, `/api/download`) return stub data — not yet wired to cached pipeline results
+- **Frontend** is placeholder UI (basic shells) — not yet connected to real API data
+- **No authentication** — designed for hackathon demo, not production deployment
+- **No database** — results are cached in-memory; lost on server restart
+- **Single-threaded** — one upload at a time; no concurrent pipeline execution
+- **Louvain community detection** operates on undirected projection — directional information is lost for community analysis
+- **Cycle detection** capped at `length_bound=6` and `max_cycles=500` for performance — may miss longer or additional cycles in very large graphs
+- **Shell detection** uses degree heuristic (O(N)) rather than exhaustive path enumeration — trades recall for speed
 
 ---
 
@@ -199,6 +349,12 @@ railway up
 ```
 
 Railway serves both the FastAPI backend and the React static build from a single URL.
+
+---
+
+## Team Members
+
+- **Simha** — Full-stack development, algorithm design, system architecture
 
 ---
 
