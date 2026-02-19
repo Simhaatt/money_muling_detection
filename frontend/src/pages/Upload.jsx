@@ -1,110 +1,219 @@
-import React, { useState } from "react";
-const STATUS_STYLES = {
-  idle: "bg-slate-100 text-slate-700",
-  uploading: "bg-blue-100 text-blue-700",
-  success: "bg-green-100 text-green-700",
-  error: "bg-red-100 text-red-700",
-};
+/**
+ * Upload.jsx — CSV Upload Page
+ * ==============================
+ * Landing page with file upload for CSV transaction data.
+ */
 
-function Upload({ onUpload, uploading = false, error = "" }) {
+import React, { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { uploadFile } from "../services/api";
+
+function Upload({ onUploadSuccess }) {
   const [file, setFile] = useState(null);
-  const [status, setStatus] = useState("idle");
-  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef(null);
+  const navigate = useNavigate();
 
-  const onFileSelected = (selected) => {
-    if (!selected) {
+  const handleFileSelect = (selectedFile) => {
+    if (!selectedFile) return;
+    if (!selectedFile.name.toLowerCase().endsWith(".csv")) {
+      setError("Only .csv files are accepted");
       return;
     }
-    setFile(selected);
-    setStatus("idle");
-  };
-
-  const handleFileChange = (event) => onFileSelected(event.target.files?.[0]);
-
-  const handleDrop = (event) => {
-    event.preventDefault();
-    onFileSelected(event.dataTransfer.files?.[0]);
+    setError("");
+    setFile(selectedFile);
   };
 
   const handleUpload = async () => {
-    if (!file) {
-      setStatus("error");
-      setMessage("Please select a CSV file before uploading.");
-      return;
-    }
+    if (!file) return;
+    setLoading(true);
+    setError("");
 
-    setStatus("uploading");
-    setMessage("Uploading file and triggering fraud detection pipeline...");
-
-    if (!onUpload) {
-      setStatus("error");
-      setMessage("Upload handler is not configured.");
-      return;
-    }
-
-    const response = await onUpload(file);
-    if (response?.ok) {
-      setStatus("success");
-      setMessage("Upload complete. Results, summary, and graph were refreshed.");
-    } else {
-      setStatus("error");
-      setMessage(response?.message || "Upload failed.");
+    try {
+      const result = await uploadFile(file);
+      if (onUploadSuccess) onUploadSuccess(result);
+      navigate("/results");
+    } catch (err) {
+      const msg = err?.response?.data?.detail || err?.message || "Upload failed";
+      setError(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const droppedFile = e.dataTransfer.files[0];
+    handleFileSelect(droppedFile);
+  };
+
   return (
-    <section className="space-y-6">
-      <header>
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Upload Data</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Drag and drop a CSV file to stage data ingestion for the next analysis run.
-        </p>
-      </header>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "40px 20px",
+        fontFamily: "'Inter', 'Segoe UI', sans-serif",
+        color: "#e2e8f0",
+      }}
+    >
+      {/* Title */}
+      <h1
+        style={{
+          fontSize: "2.5rem",
+          fontWeight: 800,
+          marginBottom: "12px",
+          background: "linear-gradient(90deg, #3b82f6, #06b6d4)",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          textAlign: "center",
+        }}
+      >
+        Money Muling Detection Engine
+      </h1>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-card">
-        <div
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={handleDrop}
-          className="flex min-h-56 flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-6 text-center transition hover:border-green-400 hover:bg-green-50/40"
-        >
-          <p className="text-sm font-medium text-slate-700">Drop CSV file here</p>
-          <p className="mt-1 text-xs text-slate-500">or choose a local file manually</p>
-          <label
-            htmlFor="csv-input"
-            className="mt-4 inline-flex cursor-pointer items-center rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
-          >
-            Select CSV File
-          </label>
-          <input id="csv-input" type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
-        </div>
+      <p
+        style={{
+          fontSize: "1.1rem",
+          color: "#94a3b8",
+          marginBottom: "40px",
+          textAlign: "center",
+          maxWidth: "500px",
+        }}
+      >
+        Upload transaction CSV file to detect fraud rings
+      </p>
 
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-            {file ? `Selected file: ${file.name}` : "No file selected"}
-          </div>
+      {/* Drop Zone */}
+      <div
+        onClick={() => fileInputRef.current?.click()}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        style={{
+          width: "100%",
+          maxWidth: "500px",
+          border: `2px dashed ${dragOver ? "#3b82f6" : file ? "#22c55e" : "#475569"}`,
+          borderRadius: "16px",
+          padding: "60px 40px",
+          textAlign: "center",
+          cursor: "pointer",
+          background: dragOver ? "rgba(59,130,246,0.1)" : "rgba(30,41,59,0.6)",
+          transition: "all 0.2s",
+          marginBottom: "20px",
+        }}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv"
+          style={{ display: "none" }}
+          onChange={(e) => handleFileSelect(e.target.files[0])}
+        />
 
-          <div className="flex items-center gap-3">
-            <span className={`rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${STATUS_STYLES[status]}`}>
-              {status}
-            </span>
-            <button
-              type="button"
-              onClick={handleUpload}
-              disabled={uploading}
-              className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
-            >
-              {uploading ? "Uploading..." : "Upload"}
-            </button>
-          </div>
-        </div>
-
-        {(message || error) && (
-          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            {message || error}
-          </div>
+        {file ? (
+          <>
+            <div style={{ fontSize: "3rem", marginBottom: "10px" }}>📄</div>
+            <p style={{ fontWeight: 600, fontSize: "1.1rem", color: "#22c55e" }}>
+              {file.name}
+            </p>
+            <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "5px" }}>
+              {(file.size / 1024).toFixed(1)} KB — Ready to upload
+            </p>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: "3rem", marginBottom: "10px" }}>📂</div>
+            <p style={{ fontWeight: 600, fontSize: "1.1rem" }}>
+              Drag & drop CSV here
+            </p>
+            <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "8px" }}>
+              or click to browse files
+            </p>
+          </>
         )}
       </div>
-    </section>
+
+      {/* Error */}
+      {error && (
+        <div
+          style={{
+            background: "rgba(239,68,68,0.15)",
+            border: "1px solid rgba(239,68,68,0.4)",
+            color: "#f87171",
+            padding: "12px 20px",
+            borderRadius: "8px",
+            marginBottom: "20px",
+            maxWidth: "500px",
+            width: "100%",
+            textAlign: "center",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* Upload Button */}
+      <button
+        onClick={handleUpload}
+        disabled={!file || loading}
+        style={{
+          background: !file || loading ? "#475569" : "linear-gradient(90deg, #3b82f6, #06b6d4)",
+          color: "#fff",
+          border: "none",
+          padding: "16px 48px",
+          borderRadius: "10px",
+          fontSize: "1.1rem",
+          fontWeight: 600,
+          cursor: !file || loading ? "not-allowed" : "pointer",
+          opacity: !file || loading ? 0.6 : 1,
+          transition: "all 0.2s",
+          minWidth: "200px",
+        }}
+      >
+        {loading ? "Analyzing..." : "Upload"}
+      </button>
+
+      {/* Format Hint */}
+      <div
+        style={{
+          marginTop: "50px",
+          background: "rgba(30,41,59,0.8)",
+          borderRadius: "12px",
+          padding: "20px 30px",
+          maxWidth: "500px",
+          width: "100%",
+          border: "1px solid #334155",
+        }}
+      >
+        <p style={{ fontWeight: 600, marginBottom: "10px", fontSize: "0.9rem" }}>
+          Required CSV Columns:
+        </p>
+        <code
+          style={{
+            display: "block",
+            background: "#0f172a",
+            padding: "12px",
+            borderRadius: "8px",
+            fontSize: "0.8rem",
+            color: "#67e8f9",
+            overflowX: "auto",
+          }}
+        >
+          transaction_id, sender_id, receiver_id, amount, timestamp
+        </code>
+      </div>
+    </div>
   );
 }
 

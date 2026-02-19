@@ -1,16 +1,16 @@
 {
   "name": "money-muling-detection-frontend",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "React frontend for the Money Muling Detection platform",
+  "description": "React frontend for the Graph-Based Money Muling Detection Engine",
   "dependencies": {
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0",
-    "react-scripts": "5.0.1",
     "axios": "^1.7.0",
+    "cytoscape": "^3.33.1",
+    "react": "^18.3.0",
+    "react-cytoscapejs": "^2.0.0",
+    "react-dom": "^18.3.0",
     "react-router-dom": "^6.23.0",
-    "recharts": "^2.12.0",
-    "react-force-graph-2d": "^1.25.0"
+    "react-scripts": "5.0.1"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
@@ -19,12 +19,20 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "GENERATE_SOURCEMAP=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
   "browserslist": {
-    "production": [">0.2%", "not dead", "not op_mini all"],
-    "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   }
 }
