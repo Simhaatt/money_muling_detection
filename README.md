@@ -80,8 +80,8 @@ Money muling is a form of money laundering where criminals recruit individuals (
 | 1 | **Graph Construction** | O(E) | Vectorized `groupby().agg()` + `nx.from_pandas_edgelist()` — bulk edge insertion from CSV |
 | 2 | **PageRank** | O(N + E) per iteration | Weighted by `total_amount`; identifies central money-funnelling nodes |
 | 3 | **Betweenness Centrality** | O(N × E) | Weighted; flags bridge/pass-through accounts |
-| 4 | **Fan-in / Fan-out Detection** | O(N) | Single-pass with pre-computed degree dicts; collector mules (in≥5, out≤2) and distributor mules (out≥5, in≤2) |
-| 5 | **Cycle Detection** | O(N + E) bounded | `nx.simple_cycles` with `length_bound=6` and `max_cycles=500` safety caps to prevent exponential blowup |
+| 4 | **Fan-in / Fan-out Detection** | O(N) | Single-pass with pre-computed degree dicts; collector mules (in≥10, out≤2) and distributor mules (out≥10, in≤2) |
+| 5 | **Cycle Detection** | O(N + E) bounded | `nx.simple_cycles` with `length_bound=5` and `max_cycles=500` safety caps to prevent exponential blowup |
 | 6 | **Louvain Community Detection** | O(N log N) | Undirected projection; tightly-connected clusters indicate coordinated rings |
 | 7 | **Risk Scoring** | O(N) | Single-pass weighted scoring with pre-computed thresholds (see weights table below) |
 | 8 | **Temporal Smurfing** | O(T log T) per account | Two-pointer sliding window over sorted timestamps; flags ≥10 txns within 72 hours |
@@ -103,9 +103,9 @@ Each account receives a base score from detected patterns, then adjustments from
 
 | Feature                           | Points | Trigger Condition |
 | --------------------------------- | ------ | ----------------- |
-| Cycle participation               | +60    | Account appears in a directed cycle (length ≤ 6) |
-| Fan-in pattern                    | +25    | in_degree ≥ 5 AND out_degree ≤ 2 |
-| Fan-out pattern                   | +25    | out_degree ≥ 5 AND in_degree ≤ 2 |
+| Cycle participation               | +60    | Account appears in a directed cycle (length ≤ 5) |
+| Fan-in pattern                    | +25    | in_degree ≥ 10 AND out_degree ≤ 2 |
+| Fan-out pattern                   | +25    | out_degree ≥ 10 AND in_degree ≤ 2 |
 | Community membership              | +20    | Part of a Louvain community cluster |
 | High PageRank                     | +10    | PageRank > 2× network mean |
 | High betweenness centrality       | +10    | Betweenness > 2× network mean |
@@ -117,7 +117,7 @@ Each account receives a base score from detected patterns, then adjustments from
 | Temporal smurfing (high velocity) | +15    | ≥ 10 transactions within any 72-hour window |
 | Shell account                     | +30    | Pass-through node (degree 2–3) in chain of depth ≥ 3 |
 | Likely payroll (suppression)      | −30%   | out_degree ≥ 10 AND < 20% of recipients forward funds |
-| Likely merchant (suppression)     | −30%   | in_degree ≥ 10 AND out_degree ≤ 1 |
+| Likely merchant (suppression)     | −30%   | in_degree ≥ 20 AND out_degree ≤ 1 |
 | Payment gateway (suppression)     | −40%   | in_degree ≥ 50 AND out_degree ≥ 50 |
 
 **Final score** clamped to **[0, 100]**.
@@ -313,25 +313,25 @@ curl -X POST http://localhost:8000/api/upload \
 | ------ | ------------------ | ------ | ------------------------------------ |
 | GET    | `/api/health`      | ✅     | Health check                         |
 | POST   | `/api/upload`      | ✅     | Upload CSV → full pipeline → JSON    |
-| GET    | `/api/graph`       | 🔲     | Serialised graph (nodes + links)     |
-| GET    | `/api/results`     | 🔲     | Full detection results               |
-| GET    | `/api/risk-scores` | 🔲     | Per-account risk scores & tiers      |
-| GET    | `/api/summary`     | 🔲     | High-level summary statistics        |
-| GET    | `/api/download`    | 🔲     | Download results as JSON file        |
+| GET    | `/api/graph`       | ✅     | Serialised graph (nodes + links)     |
+| GET    | `/api/results`     | ✅     | Full detection results               |
+| GET    | `/api/risk-scores` | ✅     | Per-account risk scores & tiers      |
+| GET    | `/api/summary`     | ✅     | High-level summary statistics        |
+| GET    | `/api/download`    | ✅     | Download results as JSON file        |
 
-✅ = Fully implemented &nbsp;&nbsp; 🔲 = Placeholder (returns stub data)
+✅ = Fully implemented
 
 ---
 
 ## Known Limitations
 
-- **GET endpoints** (`/api/graph`, `/api/results`, `/api/summary`, `/api/download`) return stub data — not yet wired to cached pipeline results
-- **Frontend** is placeholder UI (basic shells) — not yet connected to real API data
+- **GET endpoints** (`/api/graph`, `/api/results`, `/api/summary`, `/api/download`) return cached pipeline results (populated after CSV upload)
+- **Frontend** uses Tailwind CSS with sidebar navigation, metric cards, risk entities table, and interactive graph visualization
 - **No authentication** — designed for hackathon demo, not production deployment
 - **No database** — results are cached in-memory; lost on server restart
 - **Single-threaded** — one upload at a time; no concurrent pipeline execution
 - **Louvain community detection** operates on undirected projection — directional information is lost for community analysis
-- **Cycle detection** capped at `length_bound=6` and `max_cycles=500` for performance — may miss longer or additional cycles in very large graphs
+- **Cycle detection** capped at `length_bound=5` and `max_cycles=500` for performance — may miss longer or additional cycles in very large graphs
 - **Shell detection** uses degree heuristic (O(N)) rather than exhaustive path enumeration — trades recall for speed
 
 ---
@@ -354,8 +354,9 @@ Railway serves both the FastAPI backend and the React static build from a single
 
 ## Team Members
 
-- **Simha** — Full-stack development, algorithm design, system architecture
-
+- **Simhaa TT** — Full-stack development, algorithm design, system architecture
+  **Rohit Daniel A** — Full-stack development, algorithm design, system architecture
+  **Timon Joel Raj** — Full-stack development, algorithm design, system architecture
 ---
 
 ## License

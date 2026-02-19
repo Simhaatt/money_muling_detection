@@ -1,76 +1,122 @@
-/**
- * App.jsx — Root Application Component
- * ======================================
- * Orchestrates top-level layout and view switching.
- *
- * Views:
- *   upload    → Upload page     (CSV file upload — HOMEPAGE)
- *   dashboard → Dashboard page  (overview + risk summary + tables)
- *   graph     → GraphView       (interactive transaction graph)
- *   summary   → Summary page    (detailed stats + JSON download)
- *
- * State management:
- *   Detection results are lifted into App state and passed to children via props.
- *
- * Located in: frontend/src/App.jsx
- */
-
-import React, { useState } from "react";
-import Upload from "./pages/Upload";
+import React, { useCallback, useEffect, useState } from "react";
+import Sidebar from "./components/layout/Sidebar";
+import Header from "./components/layout/Header";
 import Dashboard from "./pages/Dashboard";
-import Summary from "./pages/Summary";
-import GraphView from "./components/GraphView";
-import "./styles/global.css";
+import Upload from "./pages/Upload";
+import Analytics from "./pages/Analytics";
+import NetworkAnalysis from "./pages/NetworkAnalysis";
+import { getGraph, getResults, getSummary, uploadCSV } from "./services/api";
+
+function getErrorMessage(error) {
+  if (error?.response?.data?.detail) {
+    return String(error.response.data.detail);
+  }
+  if (error?.message) {
+    return String(error.message);
+  }
+  return "Unknown error";
+}
 
 function App() {
+  const [currentView, setCurrentView] = useState("dashboard");
   const [results, setResults] = useState(null);
-  const [currentView, setCurrentView] = useState("upload");
+  const [summary, setSummary] = useState(null);
+  const [graphData, setGraphData] = useState(null);
+  const [loadingData, setLoadingData] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleResults = (data) => {
-    setResults(data);
-    setCurrentView("dashboard"); // auto-navigate after successful upload
+  const loadPipelineOutputs = useCallback(async () => {
+    setLoadingData(true);
+    setError("");
+
+    try {
+      const [resultsRes, summaryRes, graphRes] = await Promise.allSettled([
+        getResults(),
+        getSummary(),
+        getGraph(),
+      ]);
+
+      const failures = [resultsRes, summaryRes, graphRes].filter(
+        (item) => item.status === "rejected" && item.reason?.response?.status !== 404
+      );
+
+      if (resultsRes.status === "fulfilled") {
+        setResults(resultsRes.value);
+      } else if (resultsRes.reason?.response?.status === 404) {
+        setResults(null);
+      }
+
+      if (summaryRes.status === "fulfilled") {
+        setSummary(summaryRes.value);
+      } else if (summaryRes.reason?.response?.status === 404) {
+        setSummary(null);
+      }
+
+      if (graphRes.status === "fulfilled") {
+        setGraphData(graphRes.value);
+      } else if (graphRes.reason?.response?.status === 404) {
+        setGraphData(null);
+      }
+
+      if (failures.length > 0) {
+        setError(getErrorMessage(failures[0].reason));
+      }
+    } finally {
+      setLoadingData(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPipelineOutputs();
+  }, [loadPipelineOutputs]);
+
+  const handleUpload = async (file) => {
+    setUploading(true);
+    setError("");
+
+    try {
+      await uploadCSV(file);
+      await loadPipelineOutputs();
+      setCurrentView("dashboard");
+      return { ok: true };
+    } catch (uploadError) {
+      const message = getErrorMessage(uploadError);
+      setError(message);
+      return { ok: false, message };
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case "upload":
+        return <Upload onUpload={handleUpload} uploading={uploading} error={error} />;
+      case "network":
+        return <NetworkAnalysis graphData={graphData} loading={loadingData} error={error} />;
+      case "analytics":
+        return <Analytics summary={summary} loading={loadingData} />;
+      case "dashboard":
+      default:
+        return (
+          <Dashboard
+            results={results}
+            summary={summary}
+            loading={loadingData}
+            error={error}
+          />
+        );
+    }
   };
 
   return (
-    <div className="App">
-      <header>
-        <h1>💰 Money Muling Detection</h1>
-        <nav>
-          <button
-            className={currentView === "upload" ? "active" : ""}
-            onClick={() => setCurrentView("upload")}
-          >
-            Upload
-          </button>
-          <button
-            className={currentView === "dashboard" ? "active" : ""}
-            onClick={() => setCurrentView("dashboard")}
-            disabled={!results}
-          >
-            Dashboard
-          </button>
-          <button
-            className={currentView === "graph" ? "active" : ""}
-            onClick={() => setCurrentView("graph")}
-            disabled={!results}
-          >
-            Graph View
-          </button>
-          <button
-            className={currentView === "summary" ? "active" : ""}
-            onClick={() => setCurrentView("summary")}
-            disabled={!results}
-          >
-            Summary
-          </button>
-        </nav>
-      </header>
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <Sidebar currentView={currentView} onNavigate={setCurrentView} />
+      <Header />
 
-      <main>
-        {currentView === "upload" && <Upload onResults={handleResults} />}
-        {currentView === "dashboard" && <Dashboard results={results} />}
-        {currentView === "graph" && <GraphView results={results} />}
-        {currentView === "summary" && <Summary results={results} />}
+      <main className="pl-64 pt-20">
+        <div className="px-8 py-6">{renderCurrentView()}</div>
       </main>
     </div>
   );

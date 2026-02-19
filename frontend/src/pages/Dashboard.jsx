@@ -1,138 +1,88 @@
-/**
- * Dashboard.jsx — Detection Results Dashboard (Page)
- * =====================================================
- * Main overview page showing key metrics, flagged accounts, and fraud rings.
- *
- * Sections:
- *   • Summary cards  — total accounts, flagged, rings, processing time
- *   • Flagged accounts table with risk scores & detected patterns
- *   • Fraud ring summary table (Ring ID, Pattern, Members, Risk Score)
- *
- * Located in: frontend/src/pages/Dashboard.jsx
- */
-
 import React from "react";
+import MetricCard from "../components/dashboard/MetricCard";
+import RiskEntitiesTable from "../components/dashboard/RiskEntitiesTable";
 
-function Dashboard({ results }) {
-  if (!results) {
-    return (
-      <section className="page dashboard">
-        <h2>Dashboard</h2>
-        <p>
-          Welcome to the Money Muling Detection platform. Upload a transaction
-          CSV to get started.
-        </p>
-      </section>
-    );
-  }
+function Dashboard({ results, summary, loading = false, error = "" }) {
+  const suspiciousAccounts = Array.isArray(results?.suspicious_accounts)
+    ? results.suspicious_accounts
+    : [];
+  const totalAccounts = summary?.total_accounts ?? summary?.total_accounts_analyzed ?? 0;
+  const flaggedAccounts = summary?.flagged_accounts ?? summary?.suspicious_accounts_flagged ?? suspiciousAccounts.length;
+  const fraudRingsDetected = summary?.fraud_rings_detected ?? 0;
+  const totalTransactions = summary?.total_transactions ?? 0;
 
-  const { summary, suspicious_accounts = [], fraud_rings = [] } = results;
+  const dashboardMetrics = [
+    { key: "accounts", label: "Total Accounts Analyzed", value: totalAccounts.toLocaleString(), delta: "Live", tone: "neutral" },
+    { key: "suspicious", label: "Suspicious Accounts", value: flaggedAccounts.toLocaleString(), delta: "Live", tone: "alert" },
+    { key: "rings", label: "Fraud Rings Detected", value: fraudRingsDetected.toLocaleString(), delta: "Live", tone: "alert" },
+    { key: "transactions", label: "Total Transactions", value: totalTransactions.toLocaleString(), delta: "Live", tone: "neutral" },
+  ];
+
+  const riskEntities = suspiciousAccounts.map((account) => ({
+    accountId: account.account_id,
+    riskScore: Number(account.risk_score ?? account.suspicion_score ?? 0),
+    threatLevel: String(account.risk_tier || "Low"),
+    transactionCount: Number(account.transaction_count ?? account.tx_count ?? 0),
+  }));
 
   return (
-    <section className="page dashboard">
-      <h2>Dashboard</h2>
-
-      {/* ----- Summary Cards ----- */}
-      <div className="summary-cards">
-        <div className="card">
-          <h3>{summary?.total_accounts_analyzed ?? "—"}</h3>
-          <p>Total Accounts</p>
-        </div>
-        <div className="card">
-          <h3>{summary?.suspicious_accounts_flagged ?? "—"}</h3>
-          <p>Flagged Accounts</p>
-        </div>
-        <div className="card">
-          <h3>{summary?.fraud_rings_detected ?? "—"}</h3>
-          <p>Fraud Rings</p>
-        </div>
-        <div className="card">
-          <h3>{summary?.processing_time_seconds ?? "—"}s</h3>
-          <p>Processing Time</p>
+    <section className="space-y-8">
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Dashboard</h2>
+          <p className="mt-1 text-sm text-slate-500">Operational overview of account activity and risk signals.</p>
         </div>
       </div>
 
-      {/* ----- Flagged Accounts Table ----- */}
-      <h3>Flagged Accounts ({suspicious_accounts.length})</h3>
-      {suspicious_accounts.length === 0 ? (
-        <p className="empty-state">No suspicious accounts detected.</p>
-      ) : (
-        <div className="table-wrapper">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Account ID</th>
-                <th>Suspicion Score</th>
-                <th>Detected Patterns</th>
-                <th>Ring ID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {suspicious_accounts.map((acct, idx) => (
-                <tr key={acct.account_id || idx} className={
-                  acct.suspicion_score >= 80 ? "row-critical" :
-                  acct.suspicion_score >= 60 ? "row-high" :
-                  "row-medium"
-                }>
-                  <td className="mono">{acct.account_id}</td>
-                  <td>
-                    <span className="score-badge">
-                      {acct.suspicion_score}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="pattern-tags">
-                      {(acct.detected_patterns || []).map((p) => (
-                        <span key={p} className="pattern-tag">{p}</span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="mono">{acct.ring_id || "NONE"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {error && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       )}
 
-      {/* ----- Fraud Ring Summary Table ----- */}
-      <h3>Detected Fraud Rings ({fraud_rings.length})</h3>
-      {fraud_rings.length === 0 ? (
-        <p className="empty-state">No fraud rings detected.</p>
-      ) : (
-        <div className="table-wrapper">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Ring ID</th>
-                <th>Pattern Type</th>
-                <th>Member Count</th>
-                <th>Risk Score</th>
-                <th>Member Account IDs</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fraud_rings.map((ring, idx) => (
-                <tr key={ring.ring_id || idx}>
-                  <td className="mono">{ring.ring_id}</td>
-                  <td>
-                    <span className={`type-badge type-${ring.pattern_type}`}>
-                      {ring.pattern_type}
-                    </span>
-                  </td>
-                  <td>{(ring.member_accounts || []).length}</td>
-                  <td>
-                    <span className="score-badge">{ring.risk_score}</span>
-                  </td>
-                  <td className="mono members-cell">
-                    {(ring.member_accounts || []).join(", ")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <section>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {dashboardMetrics.map((metric) => (
+            <MetricCard
+              key={metric.key}
+              label={metric.label}
+              value={metric.value}
+              delta={metric.delta}
+              tone={metric.tone}
+            />
+          ))}
         </div>
-      )}
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
+        <header className="mb-4">
+          <h3 className="text-lg font-semibold text-slate-900">Transaction Network Intelligence</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Network visualization will be integrated in this container during the next phase.
+          </p>
+        </header>
+
+        <div
+          id="graph-container"
+          className="flex h-[360px] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 text-center"
+        >
+          <p className="max-w-lg text-sm text-slate-500">
+            Graph placeholder: transaction network visualization area reserved for future rendering integration.
+          </p>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">High Risk Entities</h3>
+          <p className="mt-1 text-sm text-slate-500">Loaded from /api/results and sortable for investigator review.</p>
+        </div>
+        {loading ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-card">
+            Loading risk entities...
+          </div>
+        ) : (
+          <RiskEntitiesTable rows={riskEntities} />
+        )}
+      </section>
     </section>
   );
 }

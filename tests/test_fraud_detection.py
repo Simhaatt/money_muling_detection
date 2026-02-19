@@ -203,7 +203,7 @@ class TestShellDetection:
 # ── False-positive suppression ────────────────────────────────────────────
 class TestFalsePositiveSuppression:
     def test_merchant_reduction(self):
-        """Node with in_degree >= 10, out_degree <= 1 gets reduced score."""
+        """Node with in_degree >= 20, out_degree <= 1 gets reduced score."""
         scores = {
             "MERCHANT": {
                 "account_id": "MERCHANT",
@@ -213,7 +213,7 @@ class TestFalsePositiveSuppression:
             }
         }
         G = nx.DiGraph()
-        for i in range(12):
+        for i in range(22):
             G.add_edge(f"C{i}", "MERCHANT", total_amount=100)
         # out_degree = 0
         _suppress_false_positives(G, scores)

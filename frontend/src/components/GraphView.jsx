@@ -1,17 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
 
-const COMMUNITY_COLORS = [
-  "#67e8f9",
-  "#c4b5fd",
-  "#6ee7b7",
-  "#fdba74",
-  "#f9a8d4",
-  "#93c5fd",
-  "#fca5a5",
-  "#86efac",
-];
-
 const GRAPH_ENGINE = "react-force-graph-2d";
 
 const toId = (node) => String(node?.id ?? node?.account_id ?? "");
@@ -33,10 +22,6 @@ function GraphView({ results, loading = false, error = null }) {
 
   const [minTxCount, setMinTxCount] = useState(1);
   const [minTotalAmount, setMinTotalAmount] = useState(0);
-  const [showFanIn, setShowFanIn] = useState(true);
-  const [showFanOut, setShowFanOut] = useState(true);
-  const [showCycles, setShowCycles] = useState(true);
-  const [showCommunities, setShowCommunities] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedNode, setSelectedNode] = useState(null);
   const [selectedLink, setSelectedLink] = useState(null);
@@ -47,10 +32,16 @@ function GraphView({ results, loading = false, error = null }) {
     const root = results?.graph_json || results || {};
     const nodes = Array.isArray(root?.nodes) ? root.nodes : [];
     const links = Array.isArray(root?.links) ? root.links : [];
-    const features = root?.features || results?.features || {};
 
     return {
-      nodes: nodes.map((node) => ({ ...node, id: toId(node) })),
+      nodes: nodes.map((node) => ({
+        ...node,
+        id: toId(node),
+        detected_patterns: node.detected_patterns || [],
+        ring_id: node.ring_id || "NONE",
+        suspicion_score: Number(node.suspicion_score ?? 0),
+        is_suspicious: Boolean(node.is_suspicious ?? false),
+      })),
       links: links.map((link) => ({
         ...link,
         source: toSource(link),
@@ -58,26 +49,8 @@ function GraphView({ results, loading = false, error = null }) {
         transaction_count: toTxCount(link),
         total_amount: toAmount(link),
       })),
-      features,
     };
   }, [results]);
-
-  const fanInSet = useMemo(
-    () => new Set((graphPayload.features?.fan_in_nodes || []).map(String)),
-    [graphPayload.features]
-  );
-  const fanOutSet = useMemo(
-    () => new Set((graphPayload.features?.fan_out_nodes || []).map(String)),
-    [graphPayload.features]
-  );
-  const cycleSet = useMemo(() => {
-    const direct = (graphPayload.features?.nodes_in_cycles || []).map(String);
-    const nested = Array.isArray(graphPayload.features?.cycles)
-      ? graphPayload.features.cycles.flat().map(String)
-      : [];
-    return new Set([...direct, ...nested]);
-  }, [graphPayload.features]);
-  const communities = useMemo(() => graphPayload.features?.communities || {}, [graphPayload.features]);
 
   const filteredGraph = useMemo(() => {
     const links = graphPayload.links.filter(
@@ -162,41 +135,26 @@ function GraphView({ results, loading = false, error = null }) {
     }
   }, [searchedNodeId, filteredGraph.nodes]);
 
-  const nodeFlags = (nodeId) => {
+  const nodeFlags = (node) => {
+    const patterns = node.detected_patterns || [];
     const tags = [];
-    if (showFanIn && fanInSet.has(nodeId)) {
-      tags.push("fan-in");
-    }
-    if (showFanOut && fanOutSet.has(nodeId)) {
-      tags.push("fan-out");
-    }
-    if (showCycles && cycleSet.has(nodeId)) {
-      tags.push("cycle");
-    }
+    if (patterns.some((p) => p.includes("fan_in") || p.includes("fan-in"))) tags.push("fan-in");
+    if (patterns.some((p) => p.includes("fan_out") || p.includes("fan-out"))) tags.push("fan-out");
+    if (patterns.some((p) => p.startsWith("cycle") || p.includes("cycle"))) tags.push("cycle");
+    if (patterns.some((p) => p.includes("community"))) tags.push("community");
+    if (node.ring_id && node.ring_id !== "NONE") tags.push("ring");
+    if (node.is_suspicious) tags.push("suspicious");
     return tags;
   };
 
   const nodeColor = (node) => {
-    const id = toId(node);
-    const flags = nodeFlags(id);
-    const communityId = communities[id];
-
-    if (flags.length >= 2) {
-      return "#fb7185";
-    }
-    if (flags.includes("fan-in")) {
-      return "#f97316";
-    }
-    if (flags.includes("fan-out")) {
-      return "#facc15";
-    }
-    if (flags.includes("cycle")) {
-      return "#f43f5e";
-    }
-    if (showCommunities && Number.isInteger(communityId)) {
-      return COMMUNITY_COLORS[Math.abs(communityId) % COMMUNITY_COLORS.length];
-    }
-    return "#67e8f9";
+    const flags = nodeFlags(node);
+    if (flags.includes("suspicious") && node.suspicion_score >= 80) return "#ef4444";
+    if (flags.includes("suspicious") && node.suspicion_score >= 60) return "#f97316";
+    if (flags.includes("suspicious")) return "#facc15";
+    if (flags.includes("ring")) return "#38bdf8";
+    if (flags.includes("community")) return "#67e8f9";
+    return "#a5b4fc";
   };
 
   const nodeRadius = (node) => {
@@ -215,21 +173,20 @@ function GraphView({ results, loading = false, error = null }) {
   };
 
   const selectedNodeDetails = useMemo(() => {
-    if (!selectedNode) {
-      return null;
-    }
+    if (!selectedNode) return null;
     const id = toId(selectedNode);
     return {
       id,
-      inDegree: Number(graphPayload.features?.in_degree?.[id] ?? selectedNode?.in_degree ?? 0),
-      outDegree: Number(graphPayload.features?.out_degree?.[id] ?? selectedNode?.out_degree ?? 0),
-      pagerank: Number(graphPayload.features?.pagerank?.[id] ?? selectedNode?.pagerank ?? 0),
-      betweenness: Number(graphPayload.features?.betweenness?.[id] ?? selectedNode?.betweenness ?? 0),
-      communityId: Number.isInteger(communities[id]) ? communities[id] : "—",
+      inDegree: Number(selectedNode?.in_degree ?? 0),
+      outDegree: Number(selectedNode?.out_degree ?? 0),
+      pagerank: Number(selectedNode?.pagerank ?? 0),
+      betweenness: Number(selectedNode?.betweenness ?? 0),
+      ringId: selectedNode?.ring_id ?? "NONE",
       amount: nodeAmountMap.get(id) || 0,
-      flags: nodeFlags(id),
+      flags: nodeFlags(selectedNode),
+      suspicionScore: Number(selectedNode?.suspicion_score ?? 0),
     };
-  }, [selectedNode, graphPayload.features, communities, nodeAmountMap, showFanIn, showFanOut, showCycles]);
+  }, [selectedNode, nodeAmountMap]);
 
   if (loading) {
     return (
