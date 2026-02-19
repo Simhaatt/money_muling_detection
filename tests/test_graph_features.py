@@ -40,9 +40,9 @@ def simple_graph() -> nx.DiGraph:
 
 @pytest.fixture
 def fan_in_graph() -> nx.DiGraph:
-    """A graph where node 'hub' receives from 6 senders and sends to 1."""
+    """A graph where node 'hub' receives from 11 senders and sends to 1."""
     G = nx.DiGraph()
-    for i in range(6):
+    for i in range(11):
         G.add_edge(f"sender_{i}", "hub", total_amount=100, transaction_count=1)
     G.add_edge("hub", "exit", total_amount=500, transaction_count=1)
     return G
@@ -50,10 +50,10 @@ def fan_in_graph() -> nx.DiGraph:
 
 @pytest.fixture
 def fan_out_graph() -> nx.DiGraph:
-    """A graph where node 'source' sends to 6 receivers from 1 sender."""
+    """A graph where node 'source' sends to 11 receivers from 1 sender."""
     G = nx.DiGraph()
     G.add_edge("origin", "source", total_amount=1000, transaction_count=1)
-    for i in range(6):
+    for i in range(11):
         G.add_edge("source", f"receiver_{i}", total_amount=100, transaction_count=1)
     return G
 
@@ -106,7 +106,7 @@ class TestFanIn:
 
     def test_senders_not_flagged(self, fan_in_graph: nx.DiGraph):
         nodes = detect_fan_in(fan_in_graph)
-        for i in range(6):
+        for i in range(11):
             assert f"sender_{i}" not in nodes
 
     def test_empty_graph(self, empty_graph: nx.DiGraph):
@@ -120,7 +120,7 @@ class TestFanOut:
 
     def test_receivers_not_flagged(self, fan_out_graph: nx.DiGraph):
         nodes = detect_fan_out(fan_out_graph)
-        for i in range(6):
+        for i in range(11):
             assert f"receiver_{i}" not in nodes
 
     def test_empty_graph(self, empty_graph: nx.DiGraph):

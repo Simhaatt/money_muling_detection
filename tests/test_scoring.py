@@ -32,9 +32,9 @@ def cycle_graph() -> nx.DiGraph:
 
 @pytest.fixture
 def fan_in_graph() -> nx.DiGraph:
-    """Node 'hub' receives from 6 senders, sends to 1."""
+    """Node 'hub' receives from 11 senders, sends to 1."""
     G = nx.DiGraph()
-    for i in range(6):
+    for i in range(11):
         G.add_edge(f"s{i}", "hub", total_amount=100, transaction_count=1)
     G.add_edge("hub", "exit", total_amount=500, transaction_count=1)
     return G
@@ -42,10 +42,10 @@ def fan_in_graph() -> nx.DiGraph:
 
 @pytest.fixture
 def fan_out_graph() -> nx.DiGraph:
-    """Node 'src' receives from 1, sends to 6."""
+    """Node 'src' receives from 1, sends to 11."""
     G = nx.DiGraph()
     G.add_edge("origin", "src", total_amount=1000, transaction_count=1)
-    for i in range(6):
+    for i in range(11):
         G.add_edge("src", f"r{i}", total_amount=100, transaction_count=1)
     return G
 

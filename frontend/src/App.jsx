@@ -5,7 +5,7 @@
  *
  * Views:
  *   upload    → Upload page     (CSV file upload — HOMEPAGE)
- *   dashboard → Dashboard page  (overview + risk summary)
+ *   dashboard → Dashboard page  (overview + risk summary + tables)
  *   graph     → GraphView       (interactive transaction graph)
  *   summary   → Summary page    (detailed stats + JSON download)
  *
@@ -26,6 +26,11 @@ function App() {
   const [results, setResults] = useState(null);
   const [currentView, setCurrentView] = useState("upload");
 
+  const handleResults = (data) => {
+    setResults(data);
+    setCurrentView("dashboard"); // auto-navigate after successful upload
+  };
+
   return (
     <div className="App">
       <header>
@@ -40,18 +45,21 @@ function App() {
           <button
             className={currentView === "dashboard" ? "active" : ""}
             onClick={() => setCurrentView("dashboard")}
+            disabled={!results}
           >
             Dashboard
           </button>
           <button
             className={currentView === "graph" ? "active" : ""}
             onClick={() => setCurrentView("graph")}
+            disabled={!results}
           >
             Graph View
           </button>
           <button
             className={currentView === "summary" ? "active" : ""}
             onClick={() => setCurrentView("summary")}
+            disabled={!results}
           >
             Summary
           </button>
@@ -59,8 +67,7 @@ function App() {
       </header>
 
       <main>
-        {/* TODO: Replace with React Router for production routing */}
-        {currentView === "upload" && <Upload onResults={setResults} />}
+        {currentView === "upload" && <Upload onResults={handleResults} />}
         {currentView === "dashboard" && <Dashboard results={results} />}
         {currentView === "graph" && <GraphView results={results} />}
         {currentView === "summary" && <Summary results={results} />}

@@ -21,9 +21,14 @@ async def get_graph():
 
     Response format:
         {
-            "nodes": [{"id": "ACC_1", "degree": 5, ...}],
-            "links": [{"source": "ACC_1", "target": "ACC_2", "amount": 500.0}]
+            "nodes": [{"id": "ACC_1", "in_degree": 5, "out_degree": 3}],
+            "links": [{"source": "ACC_1", "target": "ACC_2", "total_amount": 500.0}]
         }
     """
-    # TODO: Return cached graph_json from the latest detection run
-    return {"nodes": [], "links": []}
+    from app.routes.upload_routes import latest_result
+
+    if latest_result is None:
+        raise HTTPException(status_code=404, detail="No analysis available. Upload a CSV first.")
+
+    graph_json = latest_result.get("graph_json", {"nodes": [], "links": []})
+    return graph_json

@@ -408,7 +408,14 @@ def run_detection_pipeline(df: pd.DataFrame) -> dict[str, Any]:
             min(100.0, max(0.0, entry["suspicion_score"])), 1
         )
 
+    # Build ring_id lookup for graph_json node annotation
+    account_ring_map: dict[str, str] = {}
+    for e in scores.values():
+        if e["ring_id"]:
+            account_ring_map[e["account_id"]] = e["ring_id"]
+
     # Suspicious accounts: score >= 40, sorted descending
+    suspicious_set: set[str] = set()
     suspicious_accounts: list[dict[str, Any]] = sorted(
         [
             {
@@ -423,6 +430,23 @@ def run_detection_pipeline(df: pd.DataFrame) -> dict[str, Any]:
         key=lambda x: x["suspicion_score"],
         reverse=True,
     )
+    suspicious_set = {a["account_id"] for a in suspicious_accounts}
+
+    # ── Step 10: Build graph JSON for frontend visualization ---------------
+    graph_json = graph_to_json(graph)
+    # Annotate nodes with risk info for frontend coloring
+    for node_data in graph_json["nodes"]:
+        nid = node_data["id"]
+        if nid in scores:
+            node_data["suspicion_score"] = scores[nid]["suspicion_score"]
+            node_data["is_suspicious"] = nid in suspicious_set
+            node_data["ring_id"] = account_ring_map.get(nid, "NONE")
+            node_data["detected_patterns"] = scores[nid]["detected_patterns"]
+        else:
+            node_data["suspicion_score"] = 0.0
+            node_data["is_suspicious"] = False
+            node_data["ring_id"] = "NONE"
+            node_data["detected_patterns"] = []
 
     processing_time = round(time.time() - t_start, 3)
 
@@ -442,4 +466,5 @@ def run_detection_pipeline(df: pd.DataFrame) -> dict[str, Any]:
         "suspicious_accounts": suspicious_accounts,
         "fraud_rings": fraud_rings,
         "summary": summary,
+        "graph_json": graph_json,
     }

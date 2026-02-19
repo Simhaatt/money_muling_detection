@@ -208,3 +208,231 @@ nav button.active {
 .summary-details p {
   margin-bottom: 0.3rem;
 }
+
+/* ---------------------------------------------------------------------------
+   Graph Workbench (AML style)
+   --------------------------------------------------------------------------- */
+.graph-view-page {
+  width: 100%;
+}
+
+.graph-engine-note {
+  color: #7dd3fc;
+  font-size: 0.82rem;
+  margin-top: -0.4rem;
+  margin-bottom: 0.8rem;
+}
+
+.graph-workbench {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 280px 1fr 310px;
+  gap: 0.8rem;
+  min-height: 700px;
+}
+
+.graph-controls-panel,
+.graph-info-panel,
+.graph-main-panel {
+  background: linear-gradient(160deg, #0d1222, #111827 60%, #0f172a);
+  border: 1px solid #223047;
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(88, 176, 255, 0.08), 0 16px 34px rgba(2, 6, 23, 0.45);
+}
+
+.graph-controls-panel,
+.graph-info-panel {
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.graph-main-panel {
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.graph-main-panel:hover {
+  border-color: #2f4f74;
+  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.24), 0 14px 30px rgba(8, 47, 73, 0.4);
+}
+
+.graph-controls-panel h3,
+.graph-info-panel h3 {
+  margin: 0;
+  color: #dbeafe;
+}
+
+.graph-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.graph-control-group label,
+.graph-control-group .control-label {
+  color: #cbd5e1;
+  font-size: 0.86rem;
+}
+
+.graph-control-group input[type="number"],
+.graph-control-group input[type="text"] {
+  width: 100%;
+  padding: 0.52rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #0b1324;
+  color: #e2e8f0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.graph-control-group input[type="number"]:focus,
+.graph-control-group input[type="text"]:focus {
+  border-color: #38bdf8;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+}
+
+.toggle-row input[type="checkbox"] {
+  accent-color: #22d3ee;
+}
+
+.search-hint {
+  color: #fb7185;
+  font-size: 0.78rem;
+}
+
+.graph-metrics {
+  margin-top: auto;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.graph-metrics > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #2b3a54;
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.graph-metrics span {
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.graph-metrics strong {
+  color: #7dd3fc;
+}
+
+.graph-info-panel .selection-hint {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.selection-card {
+  border: 1px solid #2a3e5d;
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: rgba(15, 23, 42, 0.78);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.selection-card h4 {
+  margin: 0;
+  color: #e2e8f0;
+}
+
+.selection-card p {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0;
+  gap: 0.65rem;
+}
+
+.selection-card p span {
+  color: #94a3b8;
+  font-size: 0.84rem;
+}
+
+.selection-card p strong {
+  color: #f1f5f9;
+  font-size: 0.88rem;
+  text-align: right;
+}
+
+.tag-row {
+  margin-top: 0.3rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.risk-tag {
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: #ffe4e6;
+  border: 1px solid #be123c;
+  background: rgba(190, 24, 93, 0.28);
+  border-radius: 999px;
+  padding: 0.2rem 0.48rem;
+}
+
+.tag-muted {
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+
+.graph-state {
+  width: 100%;
+  min-height: 180px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1rem;
+  border: 1px solid #2c3f5f;
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.graph-state.loading {
+  color: #93c5fd;
+}
+
+.graph-state.error {
+  color: #fda4af;
+  border-color: #9f1239;
+}
+
+.graph-state.empty {
+  color: #cbd5e1;
+}
+
+@media (max-width: 1320px) {
+  .graph-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .graph-controls-panel,
+  .graph-info-panel {
+    order: 0;
+  }
+
+  .graph-main-panel {
+    order: 1;
+  }
+}

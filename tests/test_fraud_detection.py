@@ -59,7 +59,7 @@ class TestPipelineOutputSchema:
     def test_top_level_keys(self):
         result = run_detection_pipeline(_cycle_df())
         assert set(result.keys()) == {
-            "suspicious_accounts", "fraud_rings", "summary"
+            "suspicious_accounts", "fraud_rings", "summary", "graph_json"
         }
 
     def test_summary_keys(self):

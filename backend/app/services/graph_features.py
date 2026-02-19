@@ -33,9 +33,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Constants — tuneable thresholds
 # ---------------------------------------------------------------------------
-_FAN_IN_MIN_IN_DEGREE: int = 5    # min senders to flag as fan-in
+_FAN_IN_MIN_IN_DEGREE: int = 10   # min senders to flag as fan-in (spec: 10+)
 _FAN_IN_MAX_OUT_DEGREE: int = 2   # max receivers allowed for fan-in node
-_FAN_OUT_MIN_OUT_DEGREE: int = 5  # min receivers to flag as fan-out
+_FAN_OUT_MIN_OUT_DEGREE: int = 10 # min receivers to flag as fan-out (spec: 10+)
 _FAN_OUT_MAX_IN_DEGREE: int = 2   # max senders allowed for fan-out node
 
 
@@ -150,7 +150,7 @@ def detect_fan_out(
 
 # ── Cycle detection ───────────────────────────────────────────────────────
 # Default safety cap: avoids exponential blowup on dense graphs.
-_MAX_CYCLE_LENGTH: int = 6
+_MAX_CYCLE_LENGTH: int = 5  # spec: detect cycles of length 3 to 5
 _MAX_CYCLES_COLLECTED: int = 500
 
 
