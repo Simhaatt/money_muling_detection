@@ -11,10 +11,9 @@
 
 ## 🌐 Live Demo
 
-| Service      | URL                                                                                                                            |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Frontend** | [https://money-muling-detection.vercel.app](https://money-muling-detection.vercel.app)                                         |
-| **Backend**  | [https://moneymulingdetection-production.up.railway.app](https://moneymulingdetection-production.up.railway.app)               |
+| Service                    | URL                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------ |
+| **Application (Full Stack)** | [https://money-muling-detection.onrender.com](https://money-muling-detection.onrender.com) |
 
 > Upload a CSV file with transaction data and instantly see suspicious accounts, fraud rings, and network visualizations.
 
@@ -45,7 +44,7 @@ Money muling is a form of money laundering where criminals recruit individuals (
 | **Backend**  | Python 3.12 · FastAPI · NetworkX · python-louvain · scipy · Pandas · NumPy                                        |
 | **Frontend** | React 18 · TypeScript · Vite · Tailwind CSS · shadcn/ui · Cytoscape.js · Recharts · Framer Motion · React Router |
 | **Testing**  | pytest (backend, 5 test modules) · Vitest + Testing Library (frontend)                                            |
-| **Deploy**   | Vercel (frontend) · Railway (backend API)                                                                         |
+| **Deploy**   | Render (single Web Service — backend serves frontend static build)                                                |
 | **Dev Tools** | Uvicorn (hot-reload) · Concurrently · npm scripts · ESLint · PostCSS                                             |
 
 ---
@@ -61,10 +60,14 @@ Money muling is a form of money laundering where criminals recruit individuals (
 │                                             ├─ Analytics Charts           │
 │                                             └─ Interactive Graph Viewer   │
 └─────────────────────────────┬────────────────────────────────────────────┘
-                              │  HTTP (Axios)
+                              │  HTTP (Axios → same origin /api)
                               ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                        FastAPI Backend (port 8000)                        │
+│              Render Web Service (single deployment)                       │
+│                                                                          │
+│  FastAPI serves:                                                         │
+│    /api/*   → API routes (upload, graph, results, summary, download)     │
+│    /*       → React static files (dist/) via StaticFiles mount           │
 │                                                                          │
 │  POST /api/upload ─────────────────────────────────────────────────────  │
 │       │                                                                  │
@@ -98,7 +101,7 @@ Money muling is a form of money laundering where criminals recruit individuals (
 
 ### Data Flow
 
-1. User uploads a CSV via the React frontend
+1. User uploads a CSV via the React frontend (served from the same origin)
 2. `helpers.py` validates columns and parses the file
 3. `graph_builder.py` constructs a directed, weighted `nx.DiGraph` using vectorized Pandas operations
 4. `graph_features.py` extracts 7 categories of features (centrality, degree, cycles, communities, smurfing, shell chains, velocity)
@@ -193,7 +196,7 @@ $$
 money_muling_detection/
 │
 ├── backend/
-│   ├── main.py                          # FastAPI entry point + CORS + static serving
+│   ├── main.py                          # FastAPI entry point + CORS + static file serving
 │   ├── requirements.txt                 # Python dependencies
 │   ├── uploads/                         # Uploaded CSV files (runtime)
 │   └── app/
@@ -234,6 +237,7 @@ money_muling_detection/
 │   ├── test_fraud_detection.py          # End-to-end pipeline tests
 │   └── test_upload_routes.py            # API endpoint tests
 │
+├── Dockerfile                           # Docker image (builds frontend + serves via FastAPI)
 ├── package.json                         # Root dev scripts (concurrently)
 └── README.md
 ```
@@ -333,18 +337,18 @@ npm test
 
 ```bash
 # Upload and run detection
-curl -X POST http://localhost:8000/api/upload \
+curl -X POST https://money-muling-detection.onrender.com/api/upload \
   -F "file=@transactions.csv" \
   | python -m json.tool
 
 # Get cached results
-curl http://localhost:8000/api/results | python -m json.tool
+curl https://money-muling-detection.onrender.com/api/results | python -m json.tool
 
 # Download JSON file
-curl -O http://localhost:8000/api/download
+curl -O https://money-muling-detection.onrender.com/api/download
 
 # View summary
-curl http://localhost:8000/api/summary
+curl https://money-muling-detection.onrender.com/api/summary
 ```
 
 ### CSV Format
@@ -423,43 +427,54 @@ curl http://localhost:8000/api/summary
 
 ---
 
-## 🚢 Deployment
+## 🚢 Deployment (Render)
 
-### Frontend → Vercel
+Both frontend and backend are deployed together as a **single Render Web Service**. The FastAPI backend builds the React frontend at deploy time and serves the static files alongside the API.
+
+### Render Web Service Configuration
+
+1. Go to [render.com](https://render.com) → **New → Web Service**
+2. Connect repo: `Simhaatt/money_muling_detection`
+3. Configure:
+
+| Setting            | Value                                                              |
+| ------------------ | ------------------------------------------------------------------ |
+| **Name**           | `money-muling-detection`                                           |
+| **Root Directory** | *(leave empty — project root)*                                     |
+| **Runtime**        | Docker                                                             |
+| **Dockerfile Path**| `Dockerfile`                                                       |
+| **Plan**           | Free                                                               |
+
+4. Click **Create Web Service** — Render auto-deploys on every push to `main`
+
+### How It Works
+
+The `Dockerfile` handles the full-stack build in a single image:
+
+1. **Build stage** — Installs Node.js, runs `npm install && npm run build` in `frontend/`, producing `frontend/dist/`
+2. **Runtime stage** — Installs Python dependencies, copies the built frontend into a location served by FastAPI
+3. **Serving** — FastAPI mounts `frontend/dist/` as static files at `/` and exposes API routes at `/api/*`
+
+> Since both are on the same origin, no CORS configuration is needed in production and the frontend calls `/api/*` as relative paths.
+
+### Docker (Local)
 
 ```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy frontend
-cd frontend
-vercel --prod
+docker build -t money-muling-detection .
+docker run -p 8000:8000 money-muling-detection
+# Open http://localhost:8000
 ```
-
-Vercel auto-detects the Vite project and deploys the React SPA with edge CDN and automatic preview deployments on every push.
-
-### Backend → Railway
-
-```bash
-# Install Railway CLI
-railway login
-railway init
-railway up
-```
-
-Railway deploys the FastAPI backend. Set the start command to `uvicorn main:app --host 0.0.0.0 --port $PORT` and ensure the `backend/` directory is used as the root.
-
-> **Note:** Ensure the frontend's API base URL (in `frontend/src/services/api.ts`) points to the Railway backend URL in production.
 
 ---
 
 ## 👥 Team Members
 
-| Name               
-| ------------------ 
-| **Simhaa TT**      
-| **Rohit Daniel A** 
-| **Timon Joel Raj** 
+| Name               |
+| ------------------ |
+| **Simhaa TT**      |
+| **Rohit Daniel A** |
+| **Timon Joel Raj** |
+
 ---
 
 ## 📄 License
