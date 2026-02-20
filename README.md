@@ -25,7 +25,7 @@ Money muling is a form of money laundering where criminals recruit individuals (
 
 ### Key Capabilities
 
-- **CSV Upload** — Ingest raw transaction data (`sender`, `receiver`, `amount`, `timestamp`)
+- **CSV Upload** — Ingest raw transaction data (`transaction_id`,`sender`, `receiver`, `amount`, `timestamp`)
 - **Graph Construction** — Build directed, weighted transaction networks using NetworkX
 - **Feature Extraction** — PageRank, betweenness centrality, cycle detection, Louvain communities, fan-in/fan-out patterns
 - **Risk Scoring** — Weighted, explainable scoring engine classifying accounts into LOW / MEDIUM / HIGH / CRITICAL tiers
