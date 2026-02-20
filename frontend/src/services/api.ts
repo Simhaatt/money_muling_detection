@@ -3,7 +3,7 @@
  * Handles all HTTP communication with the FastAPI backend.
  */
 
-const API_BASE = "/api";
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${url}`, options);
