@@ -13,7 +13,7 @@
 
 | Service                    | URL                                                                                        |
 | -------------------------- | ------------------------------------------------------------------------------------------ |
-| **Application (Full Stack)** | [https://money-muling-detection.onrender.com](https://money-muling-detection.onrender.com) |
+| **Application (Full Stack)** | [https://money-muling-detection.onrender.com]([https://money-muling-detection-backend.onrender.com/]) |
 
 > Upload a CSV file with transaction data and instantly see suspicious accounts, fraud rings, and network visualizations.
 
