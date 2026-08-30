@@ -6,6 +6,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB.svg)](https://react.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![ci](https://github.com/Simhaatt/money_muling_detection/actions/workflows/ci.yml/badge.svg)](https://github.com/Simhaatt/money_muling_detection/actions/workflows/ci.yml)
 
 ---
 
@@ -13,7 +14,8 @@
 
 | Service                    | URL                                                                                        |
 | -------------------------- | ------------------------------------------------------------------------------------------ |
-| **Application (Full Stack)** | (https://money-muling-detection-backend.onrender.com/) |
+| **Application (Full Stack)** | [money-muling-detection-backend.onrender.com](https://money-muling-detection-backend.onrender.com/) |
+
 
 > Upload a CSV file with transaction data and instantly see suspicious accounts, fraud rings, and network visualizations.
 
